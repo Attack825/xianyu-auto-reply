@@ -13,14 +13,15 @@ from PIL import Image, ImageDraw, ImageFont
 from typing import List, Tuple, Dict, Optional, Any
 from loguru import logger
 
+
 class DBManager:
     """SQLite数据库管理，持久化存储Cookie和关键字"""
-    
+
     def __init__(self, db_path: str = None):
         """初始化数据库连接和表结构"""
         # 支持环境变量配置数据库路径
         if db_path is None:
-            db_path = os.getenv('DB_PATH', 'xianyu_data.db')
+            db_path = os.getenv("DB_PATH", "xianyu_data.db")
 
         # 确保数据目录存在并有正确权限
         db_dir = os.path.dirname(db_path)
@@ -52,26 +53,29 @@ class DBManager:
 
         # SQL日志配置 - 默认启用
         self.sql_log_enabled = True  # 默认启用SQL日志
-        self.sql_log_level = 'INFO'  # 默认使用INFO级别
+        self.sql_log_level = "INFO"  # 默认使用INFO级别
 
         # 允许通过环境变量覆盖默认设置
-        if os.getenv('SQL_LOG_ENABLED'):
-            self.sql_log_enabled = os.getenv('SQL_LOG_ENABLED', 'true').lower() == 'true'
-        if os.getenv('SQL_LOG_LEVEL'):
-            self.sql_log_level = os.getenv('SQL_LOG_LEVEL', 'INFO').upper()
+        if os.getenv("SQL_LOG_ENABLED"):
+            self.sql_log_enabled = (
+                os.getenv("SQL_LOG_ENABLED", "true").lower() == "true"
+            )
+        if os.getenv("SQL_LOG_LEVEL"):
+            self.sql_log_level = os.getenv("SQL_LOG_LEVEL", "INFO").upper()
 
         logger.info(f"SQL日志已启用，日志级别: {self.sql_log_level}")
 
         self.init_db()
-    
+
     def init_db(self):
         """初始化数据库表结构"""
         try:
             self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
             cursor = self.conn.cursor()
-            
+
             # 创建用户表
-            cursor.execute('''
+            cursor.execute(
+                """
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
@@ -81,10 +85,12 @@ class DBManager:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-            ''')
+            """
+            )
 
             # 创建邮箱验证码表
-            cursor.execute('''
+            cursor.execute(
+                """
             CREATE TABLE IF NOT EXISTS email_verifications (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 email TEXT NOT NULL,
@@ -93,10 +99,12 @@ class DBManager:
                 used BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-            ''')
+            """
+            )
 
             # 创建图形验证码表
-            cursor.execute('''
+            cursor.execute(
+                """
             CREATE TABLE IF NOT EXISTS captcha_codes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 session_id TEXT NOT NULL,
@@ -104,10 +112,12 @@ class DBManager:
                 expires_at TIMESTAMP NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-            ''')
+            """
+            )
 
             # 创建cookies表（添加user_id字段和auto_confirm字段）
-            cursor.execute('''
+            cursor.execute(
+                """
             CREATE TABLE IF NOT EXISTS cookies (
                 id TEXT PRIMARY KEY,
                 value TEXT NOT NULL,
@@ -116,10 +126,12 @@ class DBManager:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
-            ''')
-            
+            """
+            )
+
             # 创建keywords表
-            cursor.execute('''
+            cursor.execute(
+                """
             CREATE TABLE IF NOT EXISTS keywords (
                 cookie_id TEXT,
                 keyword TEXT,
@@ -127,20 +139,24 @@ class DBManager:
                 item_id TEXT,
                 FOREIGN KEY (cookie_id) REFERENCES cookies(id) ON DELETE CASCADE
             )
-            ''')
+            """
+            )
 
             # 创建cookie_status表
-            cursor.execute('''
+            cursor.execute(
+                """
             CREATE TABLE IF NOT EXISTS cookie_status (
                 cookie_id TEXT PRIMARY KEY,
                 enabled BOOLEAN DEFAULT TRUE,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (cookie_id) REFERENCES cookies(id) ON DELETE CASCADE
             )
-            ''')
+            """
+            )
 
             # 创建AI回复配置表
-            cursor.execute('''
+            cursor.execute(
+                """
             CREATE TABLE IF NOT EXISTS ai_reply_settings (
                 cookie_id TEXT PRIMARY KEY,
                 ai_enabled BOOLEAN DEFAULT FALSE,
@@ -155,10 +171,12 @@ class DBManager:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (cookie_id) REFERENCES cookies(id) ON DELETE CASCADE
             )
-            ''')
+            """
+            )
 
             # 创建AI对话历史表
-            cursor.execute('''
+            cursor.execute(
+                """
             CREATE TABLE IF NOT EXISTS ai_conversations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 cookie_id TEXT NOT NULL,
@@ -172,10 +190,12 @@ class DBManager:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (cookie_id) REFERENCES cookies (id) ON DELETE CASCADE
             )
-            ''')
+            """
+            )
 
             # 创建AI商品信息缓存表
-            cursor.execute('''
+            cursor.execute(
+                """
             CREATE TABLE IF NOT EXISTS ai_item_cache (
                 item_id TEXT PRIMARY KEY,
                 data TEXT NOT NULL,
@@ -183,10 +203,12 @@ class DBManager:
                 description TEXT,
                 last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-            ''')
+            """
+            )
 
             # 创建卡券表
-            cursor.execute('''
+            cursor.execute(
+                """
             CREATE TABLE IF NOT EXISTS cards (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
@@ -205,7 +227,8 @@ class DBManager:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
-            ''')
+            """
+            )
 
             # 检查并添加 user_id 列（用于数据库迁移）
             try:
@@ -213,8 +236,14 @@ class DBManager:
             except sqlite3.OperationalError:
                 # user_id 列不存在，需要添加
                 logger.info("正在为 cards 表添加 user_id 列...")
-                self._execute_sql(cursor, "ALTER TABLE cards ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1")
-                self._execute_sql(cursor, "CREATE INDEX IF NOT EXISTS idx_cards_user_id ON cards(user_id)")
+                self._execute_sql(
+                    cursor,
+                    "ALTER TABLE cards ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1",
+                )
+                self._execute_sql(
+                    cursor,
+                    "CREATE INDEX IF NOT EXISTS idx_cards_user_id ON cards(user_id)",
+                )
                 logger.info("cards 表 user_id 列添加完成")
 
             # 检查并添加 delay_seconds 列（用于自动发货延时功能）
@@ -223,7 +252,10 @@ class DBManager:
             except sqlite3.OperationalError:
                 # delay_seconds 列不存在，需要添加
                 logger.info("正在为 cards 表添加 delay_seconds 列...")
-                self._execute_sql(cursor, "ALTER TABLE cards ADD COLUMN delay_seconds INTEGER DEFAULT 0")
+                self._execute_sql(
+                    cursor,
+                    "ALTER TABLE cards ADD COLUMN delay_seconds INTEGER DEFAULT 0",
+                )
                 logger.info("cards 表 delay_seconds 列添加完成")
 
             # 检查并添加 item_id 列（用于自动回复商品ID功能）
@@ -232,11 +264,14 @@ class DBManager:
             except sqlite3.OperationalError:
                 # item_id 列不存在，需要添加
                 logger.info("正在为 keywords 表添加 item_id 列...")
-                self._execute_sql(cursor, "ALTER TABLE keywords ADD COLUMN item_id TEXT")
+                self._execute_sql(
+                    cursor, "ALTER TABLE keywords ADD COLUMN item_id TEXT"
+                )
                 logger.info("keywords 表 item_id 列添加完成")
 
             # 创建商品信息表
-            cursor.execute('''
+            cursor.execute(
+                """
             CREATE TABLE IF NOT EXISTS item_info (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 cookie_id TEXT NOT NULL,
@@ -252,10 +287,12 @@ class DBManager:
                 FOREIGN KEY (cookie_id) REFERENCES cookies(id) ON DELETE CASCADE,
                 UNIQUE(cookie_id, item_id)
             )
-            ''')
+            """
+            )
 
             # 创建自动发货规则表
-            cursor.execute('''
+            cursor.execute(
+                """
             CREATE TABLE IF NOT EXISTS delivery_rules (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 keyword TEXT NOT NULL,
@@ -268,10 +305,12 @@ class DBManager:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
             )
-            ''')
+            """
+            )
 
             # 创建默认回复表
-            cursor.execute('''
+            cursor.execute(
+                """
             CREATE TABLE IF NOT EXISTS default_replies (
                 cookie_id TEXT PRIMARY KEY,
                 enabled BOOLEAN DEFAULT FALSE,
@@ -280,10 +319,12 @@ class DBManager:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (cookie_id) REFERENCES cookies(id) ON DELETE CASCADE
             )
-            ''')
+            """
+            )
 
             # 创建通知渠道表
-            cursor.execute('''
+            cursor.execute(
+                """
             CREATE TABLE IF NOT EXISTS notification_channels (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
@@ -293,20 +334,24 @@ class DBManager:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-            ''')
+            """
+            )
 
             # 创建系统设置表
-            cursor.execute('''
+            cursor.execute(
+                """
             CREATE TABLE IF NOT EXISTS system_settings (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL,
                 description TEXT,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-            ''')
+            """
+            )
 
             # 创建消息通知配置表
-            cursor.execute('''
+            cursor.execute(
+                """
             CREATE TABLE IF NOT EXISTS message_notifications (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 cookie_id TEXT NOT NULL,
@@ -318,10 +363,12 @@ class DBManager:
                 FOREIGN KEY (channel_id) REFERENCES notification_channels(id) ON DELETE CASCADE,
                 UNIQUE(cookie_id, channel_id)
             )
-            ''')
+            """
+            )
 
             # 创建用户设置表
-            cursor.execute('''
+            cursor.execute(
+                """
             CREATE TABLE IF NOT EXISTS user_settings (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
@@ -333,13 +380,16 @@ class DBManager:
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
                 UNIQUE(user_id, key)
             )
-            ''')
+            """
+            )
 
             # 插入默认系统设置（不包括管理员密码，由reply_server.py初始化）
-            cursor.execute('''
+            cursor.execute(
+                """
             INSERT OR IGNORE INTO system_settings (key, value, description) VALUES
             ('theme_color', 'blue', '主题颜色')
-            ''')
+            """
+            )
 
             # 检查并升级数据库
             self.check_and_upgrade_db(cursor)
@@ -350,7 +400,7 @@ class DBManager:
             logger.error(f"数据库初始化失败: {e}")
             self.conn.rollback()
             raise
-            
+
     def check_and_upgrade_db(self, cursor):
         """检查数据库版本并执行必要的升级"""
         try:
@@ -363,7 +413,7 @@ class DBManager:
                 self.update_admin_user_id(cursor)
                 self.set_system_setting("db_version", "1.0", "数据库版本号")
                 logger.info("数据库升级到版本1.0完成")
-            
+
             # 如果版本低于需要升级的版本，执行升级
             if current_version < "1.1":
                 logger.info("开始升级数据库到版本1.1...")
@@ -384,22 +434,25 @@ class DBManager:
         except Exception as e:
             logger.error(f"数据库版本检查或升级失败: {e}")
             raise
-            
+
     def update_admin_user_id(self, cursor):
         """更新admin用户ID"""
         try:
             logger.info("开始更新admin用户ID...")
             # 创建默认admin用户（只在首次初始化时创建）
-            cursor.execute('SELECT COUNT(*) FROM users WHERE username = ?', ('admin',))
+            cursor.execute("SELECT COUNT(*) FROM users WHERE username = ?", ("admin",))
             admin_exists = cursor.fetchone()[0] > 0
 
             if not admin_exists:
                 # 首次创建admin用户，设置默认密码
                 default_password_hash = hashlib.sha256("admin123".encode()).hexdigest()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 INSERT INTO users (username, email, password_hash) VALUES
                 ('admin', 'admin@localhost', ?)
-                ''', (default_password_hash,))
+                """,
+                    (default_password_hash,),
+                )
                 logger.info("创建默认admin用户，密码: admin123")
 
             # 获取admin用户ID，用于历史数据绑定
@@ -413,72 +466,141 @@ class DBManager:
                     self._execute_sql(cursor, "SELECT user_id FROM cookies LIMIT 1")
                 except sqlite3.OperationalError:
                     # user_id列不存在，需要添加并更新历史数据
-                    self._execute_sql(cursor, "ALTER TABLE cookies ADD COLUMN user_id INTEGER")
-                    self._execute_sql(cursor, "UPDATE cookies SET user_id = ? WHERE user_id IS NULL", (admin_user_id,))
+                    self._execute_sql(
+                        cursor, "ALTER TABLE cookies ADD COLUMN user_id INTEGER"
+                    )
+                    self._execute_sql(
+                        cursor,
+                        "UPDATE cookies SET user_id = ? WHERE user_id IS NULL",
+                        (admin_user_id,),
+                    )
                 else:
                     # user_id列存在，更新NULL值
-                    self._execute_sql(cursor, "UPDATE cookies SET user_id = ? WHERE user_id IS NULL", (admin_user_id,))
+                    self._execute_sql(
+                        cursor,
+                        "UPDATE cookies SET user_id = ? WHERE user_id IS NULL",
+                        (admin_user_id,),
+                    )
 
                 # 为cookies表添加auto_confirm字段（如果不存在）
                 try:
-                    self._execute_sql(cursor, "SELECT auto_confirm FROM cookies LIMIT 1")
+                    self._execute_sql(
+                        cursor, "SELECT auto_confirm FROM cookies LIMIT 1"
+                    )
                 except sqlite3.OperationalError:
                     # auto_confirm列不存在，需要添加并设置默认值
-                    self._execute_sql(cursor, "ALTER TABLE cookies ADD COLUMN auto_confirm INTEGER DEFAULT 1")
-                    self._execute_sql(cursor, "UPDATE cookies SET auto_confirm = 1 WHERE auto_confirm IS NULL")
+                    self._execute_sql(
+                        cursor,
+                        "ALTER TABLE cookies ADD COLUMN auto_confirm INTEGER DEFAULT 1",
+                    )
+                    self._execute_sql(
+                        cursor,
+                        "UPDATE cookies SET auto_confirm = 1 WHERE auto_confirm IS NULL",
+                    )
                 else:
                     # auto_confirm列存在，更新NULL值
-                    self._execute_sql(cursor, "UPDATE cookies SET auto_confirm = 1 WHERE auto_confirm IS NULL")
+                    self._execute_sql(
+                        cursor,
+                        "UPDATE cookies SET auto_confirm = 1 WHERE auto_confirm IS NULL",
+                    )
 
                 # 为delivery_rules表添加user_id字段（如果不存在）
                 try:
-                    self._execute_sql(cursor, "SELECT user_id FROM delivery_rules LIMIT 1")
+                    self._execute_sql(
+                        cursor, "SELECT user_id FROM delivery_rules LIMIT 1"
+                    )
                 except sqlite3.OperationalError:
                     # user_id列不存在，需要添加并更新历史数据
-                    self._execute_sql(cursor, "ALTER TABLE delivery_rules ADD COLUMN user_id INTEGER")
-                    self._execute_sql(cursor, "UPDATE delivery_rules SET user_id = ? WHERE user_id IS NULL", (admin_user_id,))
+                    self._execute_sql(
+                        cursor, "ALTER TABLE delivery_rules ADD COLUMN user_id INTEGER"
+                    )
+                    self._execute_sql(
+                        cursor,
+                        "UPDATE delivery_rules SET user_id = ? WHERE user_id IS NULL",
+                        (admin_user_id,),
+                    )
                 else:
                     # user_id列存在，更新NULL值
-                    self._execute_sql(cursor, "UPDATE delivery_rules SET user_id = ? WHERE user_id IS NULL", (admin_user_id,))
+                    self._execute_sql(
+                        cursor,
+                        "UPDATE delivery_rules SET user_id = ? WHERE user_id IS NULL",
+                        (admin_user_id,),
+                    )
 
                 # 为notification_channels表添加user_id字段（如果不存在）
                 try:
-                    self._execute_sql(cursor, "SELECT user_id FROM notification_channels LIMIT 1")
+                    self._execute_sql(
+                        cursor, "SELECT user_id FROM notification_channels LIMIT 1"
+                    )
                 except sqlite3.OperationalError:
                     # user_id列不存在，需要添加并更新历史数据
-                    self._execute_sql(cursor, "ALTER TABLE notification_channels ADD COLUMN user_id INTEGER")
-                    self._execute_sql(cursor, "UPDATE notification_channels SET user_id = ? WHERE user_id IS NULL", (admin_user_id,))
+                    self._execute_sql(
+                        cursor,
+                        "ALTER TABLE notification_channels ADD COLUMN user_id INTEGER",
+                    )
+                    self._execute_sql(
+                        cursor,
+                        "UPDATE notification_channels SET user_id = ? WHERE user_id IS NULL",
+                        (admin_user_id,),
+                    )
                 else:
                     # user_id列存在，更新NULL值
-                    self._execute_sql(cursor, "UPDATE notification_channels SET user_id = ? WHERE user_id IS NULL", (admin_user_id,))
+                    self._execute_sql(
+                        cursor,
+                        "UPDATE notification_channels SET user_id = ? WHERE user_id IS NULL",
+                        (admin_user_id,),
+                    )
 
                 # 为email_verifications表添加type字段（如果不存在）
                 try:
-                    self._execute_sql(cursor, "SELECT type FROM email_verifications LIMIT 1")
+                    self._execute_sql(
+                        cursor, "SELECT type FROM email_verifications LIMIT 1"
+                    )
                 except sqlite3.OperationalError:
                     # type列不存在，需要添加并更新历史数据
-                    self._execute_sql(cursor, "ALTER TABLE email_verifications ADD COLUMN type TEXT DEFAULT 'register'")
-                    self._execute_sql(cursor, "UPDATE email_verifications SET type = 'register' WHERE type IS NULL")
+                    self._execute_sql(
+                        cursor,
+                        "ALTER TABLE email_verifications ADD COLUMN type TEXT DEFAULT 'register'",
+                    )
+                    self._execute_sql(
+                        cursor,
+                        "UPDATE email_verifications SET type = 'register' WHERE type IS NULL",
+                    )
                 else:
                     # type列存在，更新NULL值
-                    self._execute_sql(cursor, "UPDATE email_verifications SET type = 'register' WHERE type IS NULL")
+                    self._execute_sql(
+                        cursor,
+                        "UPDATE email_verifications SET type = 'register' WHERE type IS NULL",
+                    )
 
                 # 为cards表添加多规格字段（如果不存在）
                 try:
                     self._execute_sql(cursor, "SELECT is_multi_spec FROM cards LIMIT 1")
                 except sqlite3.OperationalError:
                     # 多规格字段不存在，需要添加
-                    self._execute_sql(cursor, "ALTER TABLE cards ADD COLUMN is_multi_spec BOOLEAN DEFAULT FALSE")
-                    self._execute_sql(cursor, "ALTER TABLE cards ADD COLUMN spec_name TEXT")
-                    self._execute_sql(cursor, "ALTER TABLE cards ADD COLUMN spec_value TEXT")
+                    self._execute_sql(
+                        cursor,
+                        "ALTER TABLE cards ADD COLUMN is_multi_spec BOOLEAN DEFAULT FALSE",
+                    )
+                    self._execute_sql(
+                        cursor, "ALTER TABLE cards ADD COLUMN spec_name TEXT"
+                    )
+                    self._execute_sql(
+                        cursor, "ALTER TABLE cards ADD COLUMN spec_value TEXT"
+                    )
                     logger.info("为cards表添加多规格字段")
 
                 # 为item_info表添加多规格字段（如果不存在）
                 try:
-                    self._execute_sql(cursor, "SELECT is_multi_spec FROM item_info LIMIT 1")
+                    self._execute_sql(
+                        cursor, "SELECT is_multi_spec FROM item_info LIMIT 1"
+                    )
                 except sqlite3.OperationalError:
                     # 多规格字段不存在，需要添加
-                    self._execute_sql(cursor, "ALTER TABLE item_info ADD COLUMN is_multi_spec BOOLEAN DEFAULT FALSE")
+                    self._execute_sql(
+                        cursor,
+                        "ALTER TABLE item_info ADD COLUMN is_multi_spec BOOLEAN DEFAULT FALSE",
+                    )
                     logger.info("为item_info表添加多规格字段")
 
                 # 处理keywords表的唯一约束问题
@@ -490,18 +612,20 @@ class DBManager:
         except Exception as e:
             logger.error(f"更新admin用户ID失败: {e}")
             raise
-            
+
     def upgrade_notification_channels_table(self, cursor):
         """升级notification_channels表的type字段约束"""
         try:
             logger.info("开始升级notification_channels表...")
-            
+
             # 检查表是否存在
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='notification_channels'")
+            cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='notification_channels'"
+            )
             if not cursor.fetchone():
                 logger.info("notification_channels表不存在，无需升级")
                 return True
-                
+
             # 检查表中是否有数据
             cursor.execute("SELECT COUNT(*) FROM notification_channels")
             count = cursor.fetchone()[0]
@@ -510,7 +634,8 @@ class DBManager:
             cursor.execute("DROP TABLE IF EXISTS notification_channels_new")
 
             # 创建临时表
-            cursor.execute('''
+            cursor.execute(
+                """
             CREATE TABLE notification_channels_new (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
@@ -521,8 +646,9 @@ class DBManager:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-            ''')
-            
+            """
+            )
+
             # 复制数据，并转换不兼容的类型
             if count > 0:
                 logger.info(f"复制 {count} 条通知渠道数据到新表")
@@ -537,46 +663,51 @@ class DBManager:
 
                 # 逐行转移数据，确保类型映射正确
                 for row in existing_data:
-                    old_type = row[3] if len(row) > 3 else 'qq'  # type字段，默认为qq
+                    old_type = row[3] if len(row) > 3 else "qq"  # type字段，默认为qq
 
                     # 类型映射规则
                     type_mapping = {
-                        'dingtalk': 'ding_talk',
-                        'ding_talk': 'ding_talk',
-                        'qq': 'qq',
-                        'email': 'qq',  # 暂时映射为qq，后续版本会支持
-                        'webhook': 'qq',  # 暂时映射为qq，后续版本会支持
-                        'wechat': 'qq',  # 暂时映射为qq，后续版本会支持
-                        'telegram': 'qq'  # 暂时映射为qq，后续版本会支持
+                        "dingtalk": "ding_talk",
+                        "ding_talk": "ding_talk",
+                        "qq": "qq",
+                        "email": "qq",  # 暂时映射为qq，后续版本会支持
+                        "webhook": "qq",  # 暂时映射为qq，后续版本会支持
+                        "wechat": "qq",  # 暂时映射为qq，后续版本会支持
+                        "telegram": "qq",  # 暂时映射为qq，后续版本会支持
                     }
 
-                    new_type = type_mapping.get(old_type, 'qq')  # 默认转换为qq类型
+                    new_type = type_mapping.get(old_type, "qq")  # 默认转换为qq类型
 
                     if old_type != new_type:
                         logger.info(f"转换通知渠道类型: {old_type} -> {new_type}")
 
                     # 插入到新表
-                    cursor.execute('''
+                    cursor.execute(
+                        """
                     INSERT INTO notification_channels_new
                     (id, name, user_id, type, config, enabled, created_at, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (
-                        row[0],  # id
-                        row[1],  # name
-                        row[2],  # user_id
-                        new_type,  # type (转换后的)
-                        row[4] if len(row) > 4 else '{}',  # config
-                        row[5] if len(row) > 5 else True,  # enabled
-                        row[6] if len(row) > 6 else None,  # created_at
-                        row[7] if len(row) > 7 else None   # updated_at
-                    ))
-            
+                    """,
+                        (
+                            row[0],  # id
+                            row[1],  # name
+                            row[2],  # user_id
+                            new_type,  # type (转换后的)
+                            row[4] if len(row) > 4 else "{}",  # config
+                            row[5] if len(row) > 5 else True,  # enabled
+                            row[6] if len(row) > 6 else None,  # created_at
+                            row[7] if len(row) > 7 else None,  # updated_at
+                        ),
+                    )
+
             # 删除旧表
             cursor.execute("DROP TABLE notification_channels")
-            
+
             # 重命名新表
-            cursor.execute("ALTER TABLE notification_channels_new RENAME TO notification_channels")
-            
+            cursor.execute(
+                "ALTER TABLE notification_channels_new RENAME TO notification_channels"
+            )
+
             logger.info("notification_channels表升级完成")
             return True
         except Exception as e:
@@ -589,7 +720,9 @@ class DBManager:
             logger.info("开始升级notification_channels表支持更多渠道类型...")
 
             # 检查表是否存在
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='notification_channels'")
+            cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='notification_channels'"
+            )
             if not cursor.fetchone():
                 logger.info("notification_channels表不存在，无需升级")
                 return True
@@ -606,7 +739,8 @@ class DBManager:
                 logger.info(f"备份 {count} 条通知渠道数据")
 
             # 创建新表，支持更多渠道类型
-            cursor.execute('''
+            cursor.execute(
+                """
             CREATE TABLE notification_channels_new (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
@@ -617,52 +751,58 @@ class DBManager:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-            ''')
+            """
+            )
 
             # 复制数据，同时处理类型映射
             if existing_data:
                 logger.info(f"迁移 {len(existing_data)} 条通知渠道数据到新表")
                 for row in existing_data:
                     # 处理类型映射，支持更多渠道类型
-                    old_type = row[3] if len(row) > 3 else 'qq'  # type字段
+                    old_type = row[3] if len(row) > 3 else "qq"  # type字段
 
                     # 扩展的类型映射规则
                     type_mapping = {
-                        'ding_talk': 'dingtalk',  # 统一为dingtalk
-                        'dingtalk': 'dingtalk',
-                        'qq': 'qq',
-                        'email': 'email',  # 现在支持email
-                        'webhook': 'webhook',  # 现在支持webhook
-                        'wechat': 'wechat',  # 现在支持wechat
-                        'telegram': 'telegram'  # 现在支持telegram
+                        "ding_talk": "dingtalk",  # 统一为dingtalk
+                        "dingtalk": "dingtalk",
+                        "qq": "qq",
+                        "email": "email",  # 现在支持email
+                        "webhook": "webhook",  # 现在支持webhook
+                        "wechat": "wechat",  # 现在支持wechat
+                        "telegram": "telegram",  # 现在支持telegram
                     }
 
-                    new_type = type_mapping.get(old_type, 'qq')  # 默认为qq
+                    new_type = type_mapping.get(old_type, "qq")  # 默认为qq
 
                     if old_type != new_type:
                         logger.info(f"转换通知渠道类型: {old_type} -> {new_type}")
 
                     # 插入到新表，确保字段完整性
-                    cursor.execute('''
+                    cursor.execute(
+                        """
                     INSERT INTO notification_channels_new
                     (id, name, user_id, type, config, enabled, created_at, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (
-                        row[0],  # id
-                        row[1],  # name
-                        row[2],  # user_id
-                        new_type,  # type (转换后的)
-                        row[4] if len(row) > 4 else '{}',  # config
-                        row[5] if len(row) > 5 else True,  # enabled
-                        row[6] if len(row) > 6 else None,  # created_at
-                        row[7] if len(row) > 7 else None   # updated_at
-                    ))
+                    """,
+                        (
+                            row[0],  # id
+                            row[1],  # name
+                            row[2],  # user_id
+                            new_type,  # type (转换后的)
+                            row[4] if len(row) > 4 else "{}",  # config
+                            row[5] if len(row) > 5 else True,  # enabled
+                            row[6] if len(row) > 6 else None,  # created_at
+                            row[7] if len(row) > 7 else None,  # updated_at
+                        ),
+                    )
 
             # 删除旧表
             cursor.execute("DROP TABLE notification_channels")
 
             # 重命名新表
-            cursor.execute("ALTER TABLE notification_channels_new RENAME TO notification_channels")
+            cursor.execute(
+                "ALTER TABLE notification_channels_new RENAME TO notification_channels"
+            )
 
             logger.info("notification_channels表类型升级完成")
             return True
@@ -677,14 +817,17 @@ class DBManager:
 
             # 检查是否有需要迁移的老表
             legacy_tables = [
-                'old_notification_channels',
-                'legacy_delivery_rules',
-                'old_keywords',
-                'backup_cookies'
+                "old_notification_channels",
+                "legacy_delivery_rules",
+                "old_keywords",
+                "backup_cookies",
             ]
 
             for table_name in legacy_tables:
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
+                cursor.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                    (table_name,),
+                )
                 if cursor.fetchone():
                     logger.info(f"发现遗留表: {table_name}，开始迁移数据...")
                     self._migrate_table_data(cursor, table_name)
@@ -698,7 +841,7 @@ class DBManager:
     def _migrate_table_data(self, cursor, table_name: str):
         """迁移指定表的数据"""
         try:
-            if table_name == 'old_notification_channels':
+            if table_name == "old_notification_channels":
                 # 迁移通知渠道数据
                 cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
                 count = cursor.fetchone()[0]
@@ -709,17 +852,22 @@ class DBManager:
 
                     for row in old_data:
                         # 处理数据格式转换
-                        cursor.execute('''
+                        cursor.execute(
+                            """
                         INSERT OR IGNORE INTO notification_channels
                         (name, user_id, type, config, enabled)
                         VALUES (?, ?, ?, ?, ?)
-                        ''', (
-                            row[1] if len(row) > 1 else f"迁移渠道_{row[0]}",
-                            row[2] if len(row) > 2 else 1,  # 默认admin用户
-                            self._normalize_channel_type(row[3] if len(row) > 3 else 'qq'),
-                            row[4] if len(row) > 4 else '{}',
-                            row[5] if len(row) > 5 else True
-                        ))
+                        """,
+                            (
+                                row[1] if len(row) > 1 else f"迁移渠道_{row[0]}",
+                                row[2] if len(row) > 2 else 1,  # 默认admin用户
+                                self._normalize_channel_type(
+                                    row[3] if len(row) > 3 else "qq"
+                                ),
+                                row[4] if len(row) > 4 else "{}",
+                                row[5] if len(row) > 5 else True,
+                            ),
+                        )
 
                     logger.info(f"成功迁移 {count} 条通知渠道数据")
 
@@ -733,25 +881,27 @@ class DBManager:
     def _normalize_channel_type(self, old_type: str) -> str:
         """标准化通知渠道类型"""
         type_mapping = {
-            'ding_talk': 'dingtalk',
-            'dingtalk': 'dingtalk',
-            'qq': 'qq',
-            'email': 'email',
-            'webhook': 'webhook',
-            'wechat': 'wechat',
-            'telegram': 'telegram',
+            "ding_talk": "dingtalk",
+            "dingtalk": "dingtalk",
+            "qq": "qq",
+            "email": "email",
+            "webhook": "webhook",
+            "wechat": "wechat",
+            "telegram": "telegram",
             # 处理一些可能的变体
-            'dingding': 'dingtalk',
-            'weixin': 'wechat',
-            'tg': 'telegram'
+            "dingding": "dingtalk",
+            "weixin": "wechat",
+            "tg": "telegram",
         }
-        return type_mapping.get(old_type.lower(), 'qq')
-    
+        return type_mapping.get(old_type.lower(), "qq")
+
     def _migrate_keywords_table_constraints(self, cursor):
         """迁移keywords表的约束，支持基于商品ID的唯一性校验"""
         try:
             # 检查是否已经迁移过（通过检查是否存在新的唯一索引）
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_keywords_unique_with_item'")
+            cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_keywords_unique_with_item'"
+            )
             if cursor.fetchone():
                 logger.info("keywords表约束已经迁移过，跳过")
                 return
@@ -759,7 +909,8 @@ class DBManager:
             logger.info("开始迁移keywords表约束...")
 
             # 1. 创建临时表，不设置主键约束
-            cursor.execute('''
+            cursor.execute(
+                """
             CREATE TABLE IF NOT EXISTS keywords_temp (
                 cookie_id TEXT,
                 keyword TEXT,
@@ -767,34 +918,41 @@ class DBManager:
                 item_id TEXT,
                 FOREIGN KEY (cookie_id) REFERENCES cookies(id) ON DELETE CASCADE
             )
-            ''')
+            """
+            )
 
             # 2. 复制现有数据到临时表
-            cursor.execute('''
+            cursor.execute(
+                """
             INSERT INTO keywords_temp (cookie_id, keyword, reply, item_id)
             SELECT cookie_id, keyword, reply, item_id FROM keywords
-            ''')
+            """
+            )
 
             # 3. 删除原表
-            cursor.execute('DROP TABLE keywords')
+            cursor.execute("DROP TABLE keywords")
 
             # 4. 重命名临时表
-            cursor.execute('ALTER TABLE keywords_temp RENAME TO keywords')
+            cursor.execute("ALTER TABLE keywords_temp RENAME TO keywords")
 
             # 5. 创建复合唯一索引来实现我们需要的约束逻辑
             # 对于item_id为空的情况：(cookie_id, keyword)必须唯一
-            cursor.execute('''
+            cursor.execute(
+                """
             CREATE UNIQUE INDEX idx_keywords_unique_no_item
             ON keywords(cookie_id, keyword)
             WHERE item_id IS NULL OR item_id = ''
-            ''')
+            """
+            )
 
             # 对于item_id不为空的情况：(cookie_id, keyword, item_id)必须唯一
-            cursor.execute('''
+            cursor.execute(
+                """
             CREATE UNIQUE INDEX idx_keywords_unique_with_item
             ON keywords(cookie_id, keyword, item_id)
             WHERE item_id IS NOT NULL AND item_id != ''
-            ''')
+            """
+            )
 
             logger.info("keywords表约束迁移完成")
 
@@ -802,7 +960,7 @@ class DBManager:
             logger.error(f"迁移keywords表约束失败: {e}")
             # 如果迁移失败，尝试回滚
             try:
-                cursor.execute('DROP TABLE IF EXISTS keywords_temp')
+                cursor.execute("DROP TABLE IF EXISTS keywords_temp")
             except:
                 pass
             raise
@@ -812,7 +970,7 @@ class DBManager:
         if self.conn:
             self.conn.close()
             self.conn = None
-    
+
     def get_connection(self):
         """获取数据库连接，如果已关闭则重新连接"""
         if self.conn is None:
@@ -839,16 +997,16 @@ class DBManager:
                     params_str = f" | 参数: [{', '.join(formatted_params)}]"
 
         # 格式化SQL（移除多余空白）
-        formatted_sql = ' '.join(sql.split())
+        formatted_sql = " ".join(sql.split())
 
         # 根据配置的日志级别输出
         log_message = f"🗄️ SQL {operation}: {formatted_sql}{params_str}"
 
-        if self.sql_log_level == 'DEBUG':
+        if self.sql_log_level == "DEBUG":
             logger.debug(log_message)
-        elif self.sql_log_level == 'INFO':
+        elif self.sql_log_level == "INFO":
             logger.info(log_message)
-        elif self.sql_log_level == 'WARNING':
+        elif self.sql_log_level == "WARNING":
             logger.warning(log_message)
         else:
             logger.debug(log_message)
@@ -865,9 +1023,11 @@ class DBManager:
         """批量执行SQL并记录日志"""
         self._log_sql(sql, f"批量执行 {len(params_list)} 条记录", "EXECUTEMANY")
         return cursor.executemany(sql, params_list)
-    
+
     # -------------------- Cookie操作 --------------------
-    def save_cookie(self, cookie_id: str, cookie_value: str, user_id: int = None) -> bool:
+    def save_cookie(
+        self, cookie_id: str, cookie_value: str, user_id: int = None
+    ) -> bool:
         """保存Cookie到数据库，如存在则更新"""
         with self.lock:
             try:
@@ -875,28 +1035,37 @@ class DBManager:
 
                 # 如果没有提供user_id，尝试从现有记录获取，否则使用admin用户ID
                 if user_id is None:
-                    self._execute_sql(cursor, "SELECT user_id FROM cookies WHERE id = ?", (cookie_id,))
+                    self._execute_sql(
+                        cursor, "SELECT user_id FROM cookies WHERE id = ?", (cookie_id,)
+                    )
                     existing = cursor.fetchone()
                     if existing:
                         user_id = existing[0]
                     else:
                         # 获取admin用户ID作为默认值
-                        self._execute_sql(cursor, "SELECT id FROM users WHERE username = 'admin'")
+                        self._execute_sql(
+                            cursor, "SELECT id FROM users WHERE username = 'admin'"
+                        )
                         admin_user = cursor.fetchone()
                         user_id = admin_user[0] if admin_user else 1
 
-                self._execute_sql(cursor,
+                self._execute_sql(
+                    cursor,
                     "INSERT OR REPLACE INTO cookies (id, value, user_id) VALUES (?, ?, ?)",
-                    (cookie_id, cookie_value, user_id)
+                    (cookie_id, cookie_value, user_id),
                 )
                 self.conn.commit()
                 logger.info(f"Cookie保存成功: {cookie_id} (用户ID: {user_id})")
 
                 # 验证保存结果
-                self._execute_sql(cursor, "SELECT user_id FROM cookies WHERE id = ?", (cookie_id,))
+                self._execute_sql(
+                    cursor, "SELECT user_id FROM cookies WHERE id = ?", (cookie_id,)
+                )
                 saved_user_id = cursor.fetchone()
                 if saved_user_id:
-                    logger.info(f"Cookie保存验证: {cookie_id} 实际绑定到用户ID: {saved_user_id[0]}")
+                    logger.info(
+                        f"Cookie保存验证: {cookie_id} 实际绑定到用户ID: {saved_user_id[0]}"
+                    )
                 else:
                     logger.error(f"Cookie保存验证失败: {cookie_id} 未找到记录")
                 return True
@@ -904,16 +1073,20 @@ class DBManager:
                 logger.error(f"Cookie保存失败: {e}")
                 self.conn.rollback()
                 return False
-    
+
     def delete_cookie(self, cookie_id: str) -> bool:
         """从数据库删除Cookie及其关键字"""
         with self.lock:
             try:
                 cursor = self.conn.cursor()
                 # 删除关联的关键字
-                self._execute_sql(cursor, "DELETE FROM keywords WHERE cookie_id = ?", (cookie_id,))
+                self._execute_sql(
+                    cursor, "DELETE FROM keywords WHERE cookie_id = ?", (cookie_id,)
+                )
                 # 删除Cookie
-                self._execute_sql(cursor, "DELETE FROM cookies WHERE id = ?", (cookie_id,))
+                self._execute_sql(
+                    cursor, "DELETE FROM cookies WHERE id = ?", (cookie_id,)
+                )
                 self.conn.commit()
                 logger.debug(f"Cookie删除成功: {cookie_id}")
                 return True
@@ -921,26 +1094,32 @@ class DBManager:
                 logger.error(f"Cookie删除失败: {e}")
                 self.conn.rollback()
                 return False
-    
+
     def get_cookie(self, cookie_id: str) -> Optional[str]:
         """获取指定Cookie值"""
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                self._execute_sql(cursor, "SELECT value FROM cookies WHERE id = ?", (cookie_id,))
+                self._execute_sql(
+                    cursor, "SELECT value FROM cookies WHERE id = ?", (cookie_id,)
+                )
                 result = cursor.fetchone()
                 return result[0] if result else None
             except Exception as e:
                 logger.error(f"获取Cookie失败: {e}")
                 return None
-    
+
     def get_all_cookies(self, user_id: int = None) -> Dict[str, str]:
         """获取所有Cookie（支持用户隔离）"""
         with self.lock:
             try:
                 cursor = self.conn.cursor()
                 if user_id is not None:
-                    self._execute_sql(cursor, "SELECT id, value FROM cookies WHERE user_id = ?", (user_id,))
+                    self._execute_sql(
+                        cursor,
+                        "SELECT id, value FROM cookies WHERE user_id = ?",
+                        (user_id,),
+                    )
                 else:
                     self._execute_sql(cursor, "SELECT id, value FROM cookies")
                 return {row[0]: row[1] for row in cursor.fetchall()}
@@ -960,14 +1139,20 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                self._execute_sql(cursor, "SELECT id, value, created_at FROM cookies WHERE id = ?", (cookie_id,))
+                self._execute_sql(
+                    cursor,
+                    "SELECT id, value, created_at FROM cookies WHERE id = ?",
+                    (cookie_id,),
+                )
                 result = cursor.fetchone()
                 if result:
                     return {
-                        'id': result[0],
-                        'cookies_str': result[1],  # 使用cookies_str字段名以匹配调用方期望
-                        'value': result[1],        # 保持向后兼容
-                        'created_at': result[2]
+                        "id": result[0],
+                        "cookies_str": result[
+                            1
+                        ],  # 使用cookies_str字段名以匹配调用方期望
+                        "value": result[1],  # 保持向后兼容
+                        "created_at": result[2],
                     }
                 return None
             except Exception as e:
@@ -979,15 +1164,19 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                self._execute_sql(cursor, "SELECT id, value, user_id, auto_confirm, created_at FROM cookies WHERE id = ?", (cookie_id,))
+                self._execute_sql(
+                    cursor,
+                    "SELECT id, value, user_id, auto_confirm, created_at FROM cookies WHERE id = ?",
+                    (cookie_id,),
+                )
                 result = cursor.fetchone()
                 if result:
                     return {
-                        'id': result[0],
-                        'value': result[1],
-                        'user_id': result[2],
-                        'auto_confirm': bool(result[3]),
-                        'created_at': result[4]
+                        "id": result[0],
+                        "value": result[1],
+                        "user_id": result[2],
+                        "auto_confirm": bool(result[3]),
+                        "created_at": result[4],
                     }
                 return None
             except Exception as e:
@@ -999,9 +1188,15 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                self._execute_sql(cursor, "UPDATE cookies SET auto_confirm = ? WHERE id = ?", (int(auto_confirm), cookie_id))
+                self._execute_sql(
+                    cursor,
+                    "UPDATE cookies SET auto_confirm = ? WHERE id = ?",
+                    (int(auto_confirm), cookie_id),
+                )
                 self.conn.commit()
-                logger.info(f"更新账号 {cookie_id} 自动确认发货设置: {'开启' if auto_confirm else '关闭'}")
+                logger.info(
+                    f"更新账号 {cookie_id} 自动确认发货设置: {'开启' if auto_confirm else '关闭'}"
+                )
                 return True
             except Exception as e:
                 logger.error(f"更新自动确认发货设置失败: {e}")
@@ -1012,7 +1207,11 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                self._execute_sql(cursor, "SELECT auto_confirm FROM cookies WHERE id = ?", (cookie_id,))
+                self._execute_sql(
+                    cursor,
+                    "SELECT auto_confirm FROM cookies WHERE id = ?",
+                    (cookie_id,),
+                )
                 result = cursor.fetchone()
                 if result:
                     return bool(result[0])
@@ -1020,7 +1219,7 @@ class DBManager:
             except Exception as e:
                 logger.error(f"获取自动确认发货设置失败: {e}")
                 return True  # 出错时默认开启
-    
+
     # -------------------- 关键字操作 --------------------
     def save_keywords(self, cookie_id: str, keywords: List[Tuple[str, str]]) -> bool:
         """保存关键字列表，先删除旧数据再插入新数据（向后兼容方法）"""
@@ -1028,28 +1227,42 @@ class DBManager:
         keywords_with_item_id = [(keyword, reply, None) for keyword, reply in keywords]
         return self.save_keywords_with_item_id(cookie_id, keywords_with_item_id)
 
-    def save_keywords_with_item_id(self, cookie_id: str, keywords: List[Tuple[str, str, str]]) -> bool:
+    def save_keywords_with_item_id(
+        self, cookie_id: str, keywords: List[Tuple[str, str, str]]
+    ) -> bool:
         """保存关键字列表（包含商品ID），先删除旧数据再插入新数据"""
         with self.lock:
             try:
                 cursor = self.conn.cursor()
 
                 # 先删除该cookie_id的所有关键字
-                self._execute_sql(cursor, "DELETE FROM keywords WHERE cookie_id = ?", (cookie_id,))
+                self._execute_sql(
+                    cursor, "DELETE FROM keywords WHERE cookie_id = ?", (cookie_id,)
+                )
 
                 # 插入新关键字，使用INSERT OR REPLACE来处理可能的唯一约束冲突
                 for keyword, reply, item_id in keywords:
                     # 标准化item_id：空字符串转为NULL
-                    normalized_item_id = item_id if item_id and item_id.strip() else None
+                    normalized_item_id = (
+                        item_id if item_id and item_id.strip() else None
+                    )
 
                     try:
-                        self._execute_sql(cursor,
+                        self._execute_sql(
+                            cursor,
                             "INSERT INTO keywords (cookie_id, keyword, reply, item_id) VALUES (?, ?, ?, ?)",
-                            (cookie_id, keyword, reply, normalized_item_id))
+                            (cookie_id, keyword, reply, normalized_item_id),
+                        )
                     except sqlite3.IntegrityError as ie:
                         # 如果遇到唯一约束冲突，记录详细错误信息
-                        item_desc = f"商品ID: {normalized_item_id}" if normalized_item_id else "通用关键词"
-                        logger.error(f"关键词唯一约束冲突: Cookie={cookie_id}, 关键词='{keyword}', {item_desc}")
+                        item_desc = (
+                            f"商品ID: {normalized_item_id}"
+                            if normalized_item_id
+                            else "通用关键词"
+                        )
+                        logger.error(
+                            f"关键词唯一约束冲突: Cookie={cookie_id}, 关键词='{keyword}', {item_desc}"
+                        )
                         raise ie
 
                 self.conn.commit()
@@ -1059,13 +1272,17 @@ class DBManager:
                 logger.error(f"关键字保存失败: {e}")
                 self.conn.rollback()
                 return False
-    
+
     def get_keywords(self, cookie_id: str) -> List[Tuple[str, str]]:
         """获取指定Cookie的关键字列表（向后兼容方法）"""
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                self._execute_sql(cursor, "SELECT keyword, reply FROM keywords WHERE cookie_id = ?", (cookie_id,))
+                self._execute_sql(
+                    cursor,
+                    "SELECT keyword, reply FROM keywords WHERE cookie_id = ?",
+                    (cookie_id,),
+                )
                 return [(row[0], row[1]) for row in cursor.fetchall()]
             except Exception as e:
                 logger.error(f"获取关键字失败: {e}")
@@ -1076,27 +1293,37 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                self._execute_sql(cursor, "SELECT keyword, reply, item_id FROM keywords WHERE cookie_id = ?", (cookie_id,))
+                self._execute_sql(
+                    cursor,
+                    "SELECT keyword, reply, item_id FROM keywords WHERE cookie_id = ?",
+                    (cookie_id,),
+                )
                 return [(row[0], row[1], row[2]) for row in cursor.fetchall()]
             except Exception as e:
                 logger.error(f"获取关键字失败: {e}")
                 return []
 
-    def check_keyword_duplicate(self, cookie_id: str, keyword: str, item_id: str = None) -> bool:
+    def check_keyword_duplicate(
+        self, cookie_id: str, keyword: str, item_id: str = None
+    ) -> bool:
         """检查关键词是否重复"""
         with self.lock:
             try:
                 cursor = self.conn.cursor()
                 if item_id:
                     # 如果有商品ID，检查相同cookie_id、keyword、item_id的组合
-                    self._execute_sql(cursor,
+                    self._execute_sql(
+                        cursor,
                         "SELECT COUNT(*) FROM keywords WHERE cookie_id = ? AND keyword = ? AND item_id = ?",
-                        (cookie_id, keyword, item_id))
+                        (cookie_id, keyword, item_id),
+                    )
                 else:
                     # 如果没有商品ID，检查相同cookie_id、keyword且item_id为空的组合
-                    self._execute_sql(cursor,
+                    self._execute_sql(
+                        cursor,
                         "SELECT COUNT(*) FROM keywords WHERE cookie_id = ? AND keyword = ? AND (item_id IS NULL OR item_id = '')",
-                        (cookie_id, keyword))
+                        (cookie_id, keyword),
+                    )
 
                 count = cursor.fetchone()[0]
                 return count > 0
@@ -1104,22 +1331,25 @@ class DBManager:
                 logger.error(f"检查关键词重复失败: {e}")
                 return False
 
-
-    
     def get_all_keywords(self, user_id: int = None) -> Dict[str, List[Tuple[str, str]]]:
         """获取所有Cookie的关键字（支持用户隔离）"""
         with self.lock:
             try:
                 cursor = self.conn.cursor()
                 if user_id is not None:
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                     SELECT k.cookie_id, k.keyword, k.reply
                     FROM keywords k
                     JOIN cookies c ON k.cookie_id = c.id
                     WHERE c.user_id = ?
-                    """, (user_id,))
+                    """,
+                        (user_id,),
+                    )
                 else:
-                    self._execute_sql(cursor, "SELECT cookie_id, keyword, reply FROM keywords")
+                    self._execute_sql(
+                        cursor, "SELECT cookie_id, keyword, reply FROM keywords"
+                    )
 
                 result = {}
                 for row in cursor.fetchall():
@@ -1138,12 +1368,17 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 INSERT OR REPLACE INTO cookie_status (cookie_id, enabled, updated_at)
                 VALUES (?, ?, CURRENT_TIMESTAMP)
-                ''', (cookie_id, enabled))
+                """,
+                    (cookie_id, enabled),
+                )
                 self.conn.commit()
-                logger.debug(f"保存Cookie状态: {cookie_id} -> {'启用' if enabled else '禁用'}")
+                logger.debug(
+                    f"保存Cookie状态: {cookie_id} -> {'启用' if enabled else '禁用'}"
+                )
             except Exception as e:
                 logger.error(f"保存Cookie状态失败: {e}")
                 raise
@@ -1153,7 +1388,10 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('SELECT enabled FROM cookie_status WHERE cookie_id = ?', (cookie_id,))
+                cursor.execute(
+                    "SELECT enabled FROM cookie_status WHERE cookie_id = ?",
+                    (cookie_id,),
+                )
                 result = cursor.fetchone()
                 return bool(result[0]) if result else True  # 默认启用
             except Exception as e:
@@ -1165,7 +1403,7 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('SELECT cookie_id, enabled FROM cookie_status')
+                cursor.execute("SELECT cookie_id, enabled FROM cookie_status")
 
                 result = {}
                 for row in cursor.fetchall():
@@ -1183,23 +1421,29 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 INSERT OR REPLACE INTO ai_reply_settings
                 (cookie_id, ai_enabled, model_name, api_key, base_url,
                  max_discount_percent, max_discount_amount, max_bargain_rounds,
                  custom_prompts, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                ''', (
-                    cookie_id,
-                    settings.get('ai_enabled', False),
-                    settings.get('model_name', 'qwen-plus'),
-                    settings.get('api_key', ''),
-                    settings.get('base_url', 'https://dashscope.aliyuncs.com/compatible-mode/v1'),
-                    settings.get('max_discount_percent', 10),
-                    settings.get('max_discount_amount', 100),
-                    settings.get('max_bargain_rounds', 3),
-                    settings.get('custom_prompts', '')
-                ))
+                """,
+                    (
+                        cookie_id,
+                        settings.get("ai_enabled", False),
+                        settings.get("model_name", "qwen-plus"),
+                        settings.get("api_key", ""),
+                        settings.get(
+                            "base_url",
+                            "https://dashscope.aliyuncs.com/compatible-mode/v1",
+                        ),
+                        settings.get("max_discount_percent", 10),
+                        settings.get("max_discount_amount", 100),
+                        settings.get("max_bargain_rounds", 3),
+                        settings.get("custom_prompts", ""),
+                    ),
+                )
                 self.conn.commit()
                 logger.debug(f"AI回复设置保存成功: {cookie_id}")
                 return True
@@ -1213,48 +1457,51 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 SELECT ai_enabled, model_name, api_key, base_url,
                        max_discount_percent, max_discount_amount, max_bargain_rounds,
                        custom_prompts
                 FROM ai_reply_settings WHERE cookie_id = ?
-                ''', (cookie_id,))
+                """,
+                    (cookie_id,),
+                )
 
                 result = cursor.fetchone()
                 if result:
                     return {
-                        'ai_enabled': bool(result[0]),
-                        'model_name': result[1],
-                        'api_key': result[2],
-                        'base_url': result[3],
-                        'max_discount_percent': result[4],
-                        'max_discount_amount': result[5],
-                        'max_bargain_rounds': result[6],
-                        'custom_prompts': result[7]
+                        "ai_enabled": bool(result[0]),
+                        "model_name": result[1],
+                        "api_key": result[2],
+                        "base_url": result[3],
+                        "max_discount_percent": result[4],
+                        "max_discount_amount": result[5],
+                        "max_bargain_rounds": result[6],
+                        "custom_prompts": result[7],
                     }
                 else:
                     # 返回默认设置
                     return {
-                        'ai_enabled': False,
-                        'model_name': 'qwen-plus',
-                        'api_key': '',
-                        'base_url': 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-                        'max_discount_percent': 10,
-                        'max_discount_amount': 100,
-                        'max_bargain_rounds': 3,
-                        'custom_prompts': ''
+                        "ai_enabled": False,
+                        "model_name": "qwen-plus",
+                        "api_key": "",
+                        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+                        "max_discount_percent": 10,
+                        "max_discount_amount": 100,
+                        "max_bargain_rounds": 3,
+                        "custom_prompts": "",
                     }
             except Exception as e:
                 logger.error(f"获取AI回复设置失败: {e}")
                 return {
-                    'ai_enabled': False,
-                    'model_name': 'qwen-plus',
-                    'api_key': '',
-                    'base_url': 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-                    'max_discount_percent': 10,
-                    'max_discount_amount': 100,
-                    'max_bargain_rounds': 3,
-                    'custom_prompts': ''
+                    "ai_enabled": False,
+                    "model_name": "qwen-plus",
+                    "api_key": "",
+                    "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+                    "max_discount_percent": 10,
+                    "max_discount_amount": 100,
+                    "max_bargain_rounds": 3,
+                    "custom_prompts": "",
                 }
 
     def get_all_ai_reply_settings(self) -> Dict[str, dict]:
@@ -1262,25 +1509,27 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 SELECT cookie_id, ai_enabled, model_name, api_key, base_url,
                        max_discount_percent, max_discount_amount, max_bargain_rounds,
                        custom_prompts
                 FROM ai_reply_settings
-                ''')
+                """
+                )
 
                 result = {}
                 for row in cursor.fetchall():
                     cookie_id = row[0]
                     result[cookie_id] = {
-                        'ai_enabled': bool(row[1]),
-                        'model_name': row[2],
-                        'api_key': row[3],
-                        'base_url': row[4],
-                        'max_discount_percent': row[5],
-                        'max_discount_amount': row[6],
-                        'max_bargain_rounds': row[7],
-                        'custom_prompts': row[8]
+                        "ai_enabled": bool(row[1]),
+                        "model_name": row[2],
+                        "api_key": row[3],
+                        "base_url": row[4],
+                        "max_discount_percent": row[5],
+                        "max_discount_amount": row[6],
+                        "max_bargain_rounds": row[7],
+                        "custom_prompts": row[8],
                     }
 
                 return result
@@ -1289,17 +1538,24 @@ class DBManager:
                 return {}
 
     # -------------------- 默认回复操作 --------------------
-    def save_default_reply(self, cookie_id: str, enabled: bool, reply_content: str = None):
+    def save_default_reply(
+        self, cookie_id: str, enabled: bool, reply_content: str = None
+    ):
         """保存默认回复设置"""
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 INSERT OR REPLACE INTO default_replies (cookie_id, enabled, reply_content, updated_at)
                 VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                ''', (cookie_id, enabled, reply_content))
+                """,
+                    (cookie_id, enabled, reply_content),
+                )
                 self.conn.commit()
-                logger.debug(f"保存默认回复设置: {cookie_id} -> {'启用' if enabled else '禁用'}")
+                logger.debug(
+                    f"保存默认回复设置: {cookie_id} -> {'启用' if enabled else '禁用'}"
+                )
             except Exception as e:
                 logger.error(f"保存默认回复设置失败: {e}")
                 raise
@@ -1309,15 +1565,18 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 SELECT enabled, reply_content FROM default_replies WHERE cookie_id = ?
-                ''', (cookie_id,))
+                """,
+                    (cookie_id,),
+                )
                 result = cursor.fetchone()
                 if result:
                     enabled, reply_content = result
                     return {
-                        'enabled': bool(enabled),
-                        'reply_content': reply_content or ''
+                        "enabled": bool(enabled),
+                        "reply_content": reply_content or "",
                     }
                 return None
             except Exception as e:
@@ -1329,14 +1588,16 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('SELECT cookie_id, enabled, reply_content FROM default_replies')
+                cursor.execute(
+                    "SELECT cookie_id, enabled, reply_content FROM default_replies"
+                )
 
                 result = {}
                 for row in cursor.fetchall():
                     cookie_id, enabled, reply_content = row
                     result[cookie_id] = {
-                        'enabled': bool(enabled),
-                        'reply_content': reply_content or ''
+                        "enabled": bool(enabled),
+                        "reply_content": reply_content or "",
                     }
 
                 return result
@@ -1349,7 +1610,11 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                self._execute_sql(cursor, "DELETE FROM default_replies WHERE cookie_id = ?", (cookie_id,))
+                self._execute_sql(
+                    cursor,
+                    "DELETE FROM default_replies WHERE cookie_id = ?",
+                    (cookie_id,),
+                )
                 self.conn.commit()
                 logger.debug(f"删除默认回复设置: {cookie_id}")
                 return True
@@ -1359,15 +1624,20 @@ class DBManager:
                 return False
 
     # -------------------- 通知渠道操作 --------------------
-    def create_notification_channel(self, name: str, channel_type: str, config: str, user_id: int = None) -> int:
+    def create_notification_channel(
+        self, name: str, channel_type: str, config: str, user_id: int = None
+    ) -> int:
         """创建通知渠道"""
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 INSERT INTO notification_channels (name, type, config, user_id)
                 VALUES (?, ?, ?, ?)
-                ''', (name, channel_type, config, user_id))
+                """,
+                    (name, channel_type, config, user_id),
+                )
                 self.conn.commit()
                 channel_id = cursor.lastrowid
                 logger.debug(f"创建通知渠道: {name} (ID: {channel_id})")
@@ -1383,30 +1653,37 @@ class DBManager:
             try:
                 cursor = self.conn.cursor()
                 if user_id is not None:
-                    cursor.execute('''
+                    cursor.execute(
+                        """
                     SELECT id, name, type, config, enabled, created_at, updated_at
                     FROM notification_channels
                     WHERE user_id = ?
                     ORDER BY created_at DESC
-                    ''', (user_id,))
+                    """,
+                        (user_id,),
+                    )
                 else:
-                    cursor.execute('''
+                    cursor.execute(
+                        """
                     SELECT id, name, type, config, enabled, created_at, updated_at
                     FROM notification_channels
                     ORDER BY created_at DESC
-                    ''')
+                    """
+                    )
 
                 channels = []
                 for row in cursor.fetchall():
-                    channels.append({
-                        'id': row[0],
-                        'name': row[1],
-                        'type': row[2],
-                        'config': row[3],
-                        'enabled': bool(row[4]),
-                        'created_at': row[5],
-                        'updated_at': row[6]
-                    })
+                    channels.append(
+                        {
+                            "id": row[0],
+                            "name": row[1],
+                            "type": row[2],
+                            "config": row[3],
+                            "enabled": bool(row[4]),
+                            "created_at": row[5],
+                            "updated_at": row[6],
+                        }
+                    )
 
                 return channels
             except Exception as e:
@@ -1418,37 +1695,45 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 SELECT id, name, type, config, enabled, created_at, updated_at
                 FROM notification_channels WHERE id = ?
-                ''', (channel_id,))
+                """,
+                    (channel_id,),
+                )
 
                 row = cursor.fetchone()
                 if row:
                     return {
-                        'id': row[0],
-                        'name': row[1],
-                        'type': row[2],
-                        'config': row[3],
-                        'enabled': bool(row[4]),
-                        'created_at': row[5],
-                        'updated_at': row[6]
+                        "id": row[0],
+                        "name": row[1],
+                        "type": row[2],
+                        "config": row[3],
+                        "enabled": bool(row[4]),
+                        "created_at": row[5],
+                        "updated_at": row[6],
                     }
                 return None
             except Exception as e:
                 logger.error(f"获取通知渠道失败: {e}")
                 return None
 
-    def update_notification_channel(self, channel_id: int, name: str, config: str, enabled: bool = True) -> bool:
+    def update_notification_channel(
+        self, channel_id: int, name: str, config: str, enabled: bool = True
+    ) -> bool:
         """更新通知渠道"""
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 UPDATE notification_channels
                 SET name = ?, config = ?, enabled = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
-                ''', (name, config, enabled, channel_id))
+                """,
+                    (name, config, enabled, channel_id),
+                )
                 self.conn.commit()
                 logger.debug(f"更新通知渠道: {channel_id}")
                 return cursor.rowcount > 0
@@ -1462,7 +1747,11 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                self._execute_sql(cursor, "DELETE FROM notification_channels WHERE id = ?", (channel_id,))
+                self._execute_sql(
+                    cursor,
+                    "DELETE FROM notification_channels WHERE id = ?",
+                    (channel_id,),
+                )
                 self.conn.commit()
                 logger.debug(f"删除通知渠道: {channel_id}")
                 return cursor.rowcount > 0
@@ -1472,15 +1761,20 @@ class DBManager:
                 return False
 
     # -------------------- 消息通知配置操作 --------------------
-    def set_message_notification(self, cookie_id: str, channel_id: int, enabled: bool = True) -> bool:
+    def set_message_notification(
+        self, cookie_id: str, channel_id: int, enabled: bool = True
+    ) -> bool:
         """设置账号的消息通知"""
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 INSERT OR REPLACE INTO message_notifications (cookie_id, channel_id, enabled)
                 VALUES (?, ?, ?)
-                ''', (cookie_id, channel_id, enabled))
+                """,
+                    (cookie_id, channel_id, enabled),
+                )
                 self.conn.commit()
                 logger.debug(f"设置消息通知: {cookie_id} -> {channel_id}")
                 return True
@@ -1494,24 +1788,29 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 SELECT mn.id, mn.channel_id, mn.enabled, nc.name, nc.type, nc.config
                 FROM message_notifications mn
                 JOIN notification_channels nc ON mn.channel_id = nc.id
                 WHERE mn.cookie_id = ? AND nc.enabled = 1
                 ORDER BY mn.id
-                ''', (cookie_id,))
+                """,
+                    (cookie_id,),
+                )
 
                 notifications = []
                 for row in cursor.fetchall():
-                    notifications.append({
-                        'id': row[0],
-                        'channel_id': row[1],
-                        'enabled': bool(row[2]),
-                        'channel_name': row[3],
-                        'channel_type': row[4],
-                        'channel_config': row[5]
-                    })
+                    notifications.append(
+                        {
+                            "id": row[0],
+                            "channel_id": row[1],
+                            "enabled": bool(row[2]),
+                            "channel_name": row[3],
+                            "channel_type": row[4],
+                            "channel_config": row[5],
+                        }
+                    )
 
                 return notifications
             except Exception as e:
@@ -1523,13 +1822,15 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 SELECT mn.cookie_id, mn.id, mn.channel_id, mn.enabled, nc.name, nc.type, nc.config
                 FROM message_notifications mn
                 JOIN notification_channels nc ON mn.channel_id = nc.id
                 WHERE nc.enabled = 1
                 ORDER BY mn.cookie_id, mn.id
-                ''')
+                """
+                )
 
                 result = {}
                 for row in cursor.fetchall():
@@ -1537,14 +1838,16 @@ class DBManager:
                     if cookie_id not in result:
                         result[cookie_id] = []
 
-                    result[cookie_id].append({
-                        'id': row[1],
-                        'channel_id': row[2],
-                        'enabled': bool(row[3]),
-                        'channel_name': row[4],
-                        'channel_type': row[5],
-                        'channel_config': row[6]
-                    })
+                    result[cookie_id].append(
+                        {
+                            "id": row[1],
+                            "channel_id": row[2],
+                            "enabled": bool(row[3]),
+                            "channel_name": row[4],
+                            "channel_type": row[5],
+                            "channel_config": row[6],
+                        }
+                    )
 
                 return result
             except Exception as e:
@@ -1556,7 +1859,11 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                self._execute_sql(cursor, "DELETE FROM message_notifications WHERE id = ?", (notification_id,))
+                self._execute_sql(
+                    cursor,
+                    "DELETE FROM message_notifications WHERE id = ?",
+                    (notification_id,),
+                )
                 self.conn.commit()
                 logger.debug(f"删除消息通知配置: {notification_id}")
                 return cursor.rowcount > 0
@@ -1570,7 +1877,11 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                self._execute_sql(cursor, "DELETE FROM message_notifications WHERE cookie_id = ?", (cookie_id,))
+                self._execute_sql(
+                    cursor,
+                    "DELETE FROM message_notifications WHERE cookie_id = ?",
+                    (cookie_id,),
+                )
                 self.conn.commit()
                 logger.debug(f"删除账号通知配置: {cookie_id}")
                 return cursor.rowcount > 0
@@ -1586,57 +1897,84 @@ class DBManager:
             try:
                 cursor = self.conn.cursor()
                 backup_data = {
-                    'version': '1.0',
-                    'timestamp': time.time(),
-                    'user_id': user_id,
-                    'data': {}
+                    "version": "1.0",
+                    "timestamp": time.time(),
+                    "user_id": user_id,
+                    "data": {},
                 }
 
                 if user_id is not None:
                     # 用户级备份：只备份该用户的数据
                     # 备份用户的cookies
-                    self._execute_sql(cursor, "SELECT * FROM cookies WHERE user_id = ?", (user_id,))
+                    self._execute_sql(
+                        cursor, "SELECT * FROM cookies WHERE user_id = ?", (user_id,)
+                    )
                     columns = [description[0] for description in cursor.description]
                     rows = cursor.fetchall()
-                    backup_data['data']['cookies'] = {
-                        'columns': columns,
-                        'rows': [list(row) for row in rows]
+                    backup_data["data"]["cookies"] = {
+                        "columns": columns,
+                        "rows": [list(row) for row in rows],
                     }
 
                     # 备份用户cookies相关的其他数据
-                    user_cookie_ids = [row[0] for row in rows]  # 获取用户的cookie_id列表
+                    user_cookie_ids = [
+                        row[0] for row in rows
+                    ]  # 获取用户的cookie_id列表
 
                     if user_cookie_ids:
-                        placeholders = ','.join(['?' for _ in user_cookie_ids])
+                        placeholders = ",".join(["?" for _ in user_cookie_ids])
 
                         # 备份关键字
-                        cursor.execute(f"SELECT * FROM keywords WHERE cookie_id IN ({placeholders})", user_cookie_ids)
+                        cursor.execute(
+                            f"SELECT * FROM keywords WHERE cookie_id IN ({placeholders})",
+                            user_cookie_ids,
+                        )
                         columns = [description[0] for description in cursor.description]
                         rows = cursor.fetchall()
-                        backup_data['data']['keywords'] = {
-                            'columns': columns,
-                            'rows': [list(row) for row in rows]
+                        backup_data["data"]["keywords"] = {
+                            "columns": columns,
+                            "rows": [list(row) for row in rows],
                         }
 
                         # 备份其他相关表
-                        related_tables = ['cookie_status', 'default_replies', 'message_notifications',
-                                        'item_info', 'ai_reply_settings', 'ai_conversations']
+                        related_tables = [
+                            "cookie_status",
+                            "default_replies",
+                            "message_notifications",
+                            "item_info",
+                            "ai_reply_settings",
+                            "ai_conversations",
+                        ]
 
                         for table in related_tables:
-                            cursor.execute(f"SELECT * FROM {table} WHERE cookie_id IN ({placeholders})", user_cookie_ids)
-                            columns = [description[0] for description in cursor.description]
+                            cursor.execute(
+                                f"SELECT * FROM {table} WHERE cookie_id IN ({placeholders})",
+                                user_cookie_ids,
+                            )
+                            columns = [
+                                description[0] for description in cursor.description
+                            ]
                             rows = cursor.fetchall()
-                            backup_data['data'][table] = {
-                                'columns': columns,
-                                'rows': [list(row) for row in rows]
+                            backup_data["data"][table] = {
+                                "columns": columns,
+                                "rows": [list(row) for row in rows],
                             }
                 else:
                     # 系统级备份：备份所有数据
                     tables = [
-                        'cookies', 'keywords', 'cookie_status', 'cards',
-                        'delivery_rules', 'default_replies', 'notification_channels',
-                        'message_notifications', 'system_settings', 'item_info',
-                        'ai_reply_settings', 'ai_conversations', 'ai_item_cache'
+                        "cookies",
+                        "keywords",
+                        "cookie_status",
+                        "cards",
+                        "delivery_rules",
+                        "default_replies",
+                        "notification_channels",
+                        "message_notifications",
+                        "system_settings",
+                        "item_info",
+                        "ai_reply_settings",
+                        "ai_conversations",
+                        "ai_item_cache",
                     ]
 
                     for table in tables:
@@ -1644,9 +1982,9 @@ class DBManager:
                         columns = [description[0] for description in cursor.description]
                         rows = cursor.fetchall()
 
-                        backup_data['data'][table] = {
-                            'columns': columns,
-                            'rows': [list(row) for row in rows]
+                        backup_data["data"][table] = {
+                            "columns": columns,
+                            "rows": [list(row) for row in rows],
                         }
 
                 logger.info(f"导出备份成功，用户ID: {user_id}")
@@ -1661,7 +1999,7 @@ class DBManager:
         with self.lock:
             try:
                 # 验证备份数据格式
-                if not isinstance(backup_data, dict) or 'data' not in backup_data:
+                if not isinstance(backup_data, dict) or "data" not in backup_data:
                     raise ValueError("备份数据格式无效")
 
                 # 开始事务
@@ -1671,70 +2009,113 @@ class DBManager:
                 if user_id is not None:
                     # 用户级导入：只清空该用户的数据
                     # 获取用户的cookie_id列表
-                    self._execute_sql(cursor, "SELECT id FROM cookies WHERE user_id = ?", (user_id,))
+                    self._execute_sql(
+                        cursor, "SELECT id FROM cookies WHERE user_id = ?", (user_id,)
+                    )
                     user_cookie_ids = [row[0] for row in cursor.fetchall()]
 
                     if user_cookie_ids:
-                        placeholders = ','.join(['?' for _ in user_cookie_ids])
+                        placeholders = ",".join(["?" for _ in user_cookie_ids])
 
                         # 删除用户相关数据
-                        related_tables = ['message_notifications', 'default_replies', 'item_info',
-                                        'cookie_status', 'keywords', 'ai_conversations', 'ai_reply_settings']
+                        related_tables = [
+                            "message_notifications",
+                            "default_replies",
+                            "item_info",
+                            "cookie_status",
+                            "keywords",
+                            "ai_conversations",
+                            "ai_reply_settings",
+                        ]
 
                         for table in related_tables:
-                            cursor.execute(f"DELETE FROM {table} WHERE cookie_id IN ({placeholders})", user_cookie_ids)
+                            cursor.execute(
+                                f"DELETE FROM {table} WHERE cookie_id IN ({placeholders})",
+                                user_cookie_ids,
+                            )
 
                         # 删除用户的cookies
-                        self._execute_sql(cursor, "DELETE FROM cookies WHERE user_id = ?", (user_id,))
+                        self._execute_sql(
+                            cursor, "DELETE FROM cookies WHERE user_id = ?", (user_id,)
+                        )
                 else:
                     # 系统级导入：清空所有数据（除了用户和管理员密码）
                     tables = [
-                        'message_notifications', 'notification_channels', 'default_replies',
-                        'delivery_rules', 'cards', 'item_info', 'cookie_status', 'keywords',
-                        'ai_conversations', 'ai_reply_settings', 'ai_item_cache', 'cookies'
+                        "message_notifications",
+                        "notification_channels",
+                        "default_replies",
+                        "delivery_rules",
+                        "cards",
+                        "item_info",
+                        "cookie_status",
+                        "keywords",
+                        "ai_conversations",
+                        "ai_reply_settings",
+                        "ai_item_cache",
+                        "cookies",
                     ]
 
                     for table in tables:
                         cursor.execute(f"DELETE FROM {table}")
 
                     # 清空系统设置（保留管理员密码）
-                    self._execute_sql(cursor, "DELETE FROM system_settings WHERE key != 'admin_password_hash'")
+                    self._execute_sql(
+                        cursor,
+                        "DELETE FROM system_settings WHERE key != 'admin_password_hash'",
+                    )
 
                 # 导入数据
-                data = backup_data['data']
+                data = backup_data["data"]
                 for table_name, table_data in data.items():
-                    if table_name not in ['cookies', 'keywords', 'cookie_status', 'cards',
-                                        'delivery_rules', 'default_replies', 'notification_channels',
-                                        'message_notifications', 'system_settings', 'item_info',
-                                        'ai_reply_settings', 'ai_conversations', 'ai_item_cache']:
+                    if table_name not in [
+                        "cookies",
+                        "keywords",
+                        "cookie_status",
+                        "cards",
+                        "delivery_rules",
+                        "default_replies",
+                        "notification_channels",
+                        "message_notifications",
+                        "system_settings",
+                        "item_info",
+                        "ai_reply_settings",
+                        "ai_conversations",
+                        "ai_item_cache",
+                    ]:
                         continue
 
-                    columns = table_data['columns']
-                    rows = table_data['rows']
+                    columns = table_data["columns"]
+                    rows = table_data["rows"]
 
                     if not rows:
                         continue
 
                     # 如果是用户级导入，需要确保cookies表的user_id正确
-                    if user_id is not None and table_name == 'cookies':
+                    if user_id is not None and table_name == "cookies":
                         # 更新所有导入的cookies的user_id
                         updated_rows = []
                         for row in rows:
                             row_dict = dict(zip(columns, row))
-                            row_dict['user_id'] = user_id
+                            row_dict["user_id"] = user_id
                             updated_rows.append([row_dict[col] for col in columns])
                         rows = updated_rows
 
                     # 构建插入语句
-                    placeholders = ','.join(['?' for _ in columns])
+                    placeholders = ",".join(["?" for _ in columns])
 
-                    if table_name == 'system_settings':
+                    if table_name == "system_settings":
                         # 系统设置需要特殊处理，避免覆盖管理员密码
                         for row in rows:
-                            if len(row) >= 1 and row[0] != 'admin_password_hash':
-                                cursor.execute(f"INSERT INTO {table_name} ({','.join(columns)}) VALUES ({placeholders})", row)
+                            if len(row) >= 1 and row[0] != "admin_password_hash":
+                                cursor.execute(
+                                    f"INSERT INTO {table_name} ({','.join(columns)}) VALUES ({placeholders})",
+                                    row,
+                                )
                     else:
-                        cursor.executemany(f"INSERT INTO {table_name} ({','.join(columns)}) VALUES ({placeholders})", rows)
+                        cursor.executemany(
+                            f"INSERT INTO {table_name} ({','.join(columns)}) VALUES ({placeholders})",
+                            rows,
+                        )
 
                 # 提交事务
                 self.conn.commit()
@@ -1752,7 +2133,9 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                self._execute_sql(cursor, "SELECT value FROM system_settings WHERE key = ?", (key,))
+                self._execute_sql(
+                    cursor, "SELECT value FROM system_settings WHERE key = ?", (key,)
+                )
                 result = cursor.fetchone()
                 return result[0] if result else None
             except Exception as e:
@@ -1764,10 +2147,13 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 INSERT OR REPLACE INTO system_settings (key, value, description, updated_at)
                 VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                ''', (key, value, description))
+                """,
+                    (key, value, description),
+                )
                 self.conn.commit()
                 logger.debug(f"设置系统设置: {key}")
                 return True
@@ -1803,10 +2189,13 @@ class DBManager:
                 cursor = self.conn.cursor()
                 password_hash = hashlib.sha256(password.encode()).hexdigest()
 
-                cursor.execute('''
+                cursor.execute(
+                    """
                 INSERT INTO users (username, email, password_hash)
                 VALUES (?, ?, ?)
-                ''', (username, email, password_hash))
+                """,
+                    (username, email, password_hash),
+                )
 
                 self.conn.commit()
                 logger.info(f"创建用户成功: {username} ({email})")
@@ -1825,21 +2214,24 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 SELECT id, username, email, password_hash, is_active, created_at, updated_at
                 FROM users WHERE username = ?
-                ''', (username,))
+                """,
+                    (username,),
+                )
 
                 row = cursor.fetchone()
                 if row:
                     return {
-                        'id': row[0],
-                        'username': row[1],
-                        'email': row[2],
-                        'password_hash': row[3],
-                        'is_active': row[4],
-                        'created_at': row[5],
-                        'updated_at': row[6]
+                        "id": row[0],
+                        "username": row[1],
+                        "email": row[2],
+                        "password_hash": row[3],
+                        "is_active": row[4],
+                        "created_at": row[5],
+                        "updated_at": row[6],
                     }
                 return None
             except Exception as e:
@@ -1851,21 +2243,24 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 SELECT id, username, email, password_hash, is_active, created_at, updated_at
                 FROM users WHERE email = ?
-                ''', (email,))
+                """,
+                    (email,),
+                )
 
                 row = cursor.fetchone()
                 if row:
                     return {
-                        'id': row[0],
-                        'username': row[1],
-                        'email': row[2],
-                        'password_hash': row[3],
-                        'is_active': row[4],
-                        'created_at': row[5],
-                        'updated_at': row[6]
+                        "id": row[0],
+                        "username": row[1],
+                        "email": row[2],
+                        "password_hash": row[3],
+                        "is_active": row[4],
+                        "created_at": row[5],
+                        "updated_at": row[6],
                     }
                 return None
             except Exception as e:
@@ -1879,7 +2274,7 @@ class DBManager:
             return False
 
         password_hash = hashlib.sha256(password.encode()).hexdigest()
-        return user['password_hash'] == password_hash and user['is_active']
+        return user["password_hash"] == password_hash and user["is_active"]
 
     def update_user_password(self, username: str, new_password: str) -> bool:
         """更新用户密码"""
@@ -1888,10 +2283,13 @@ class DBManager:
                 cursor = self.conn.cursor()
                 password_hash = hashlib.sha256(new_password.encode()).hexdigest()
 
-                cursor.execute('''
+                cursor.execute(
+                    """
                 UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE username = ?
-                ''', (password_hash, username))
+                """,
+                    (password_hash, username),
+                )
 
                 if cursor.rowcount > 0:
                     self.conn.commit()
@@ -1908,7 +2306,7 @@ class DBManager:
 
     def generate_verification_code(self) -> str:
         """生成6位数字验证码"""
-        return ''.join(random.choices(string.digits, k=6))
+        return "".join(random.choices(string.digits, k=6))
 
     def generate_captcha(self) -> Tuple[str, str]:
         """生成图形验证码
@@ -1917,11 +2315,11 @@ class DBManager:
         try:
             # 生成4位随机验证码（数字+字母）
             chars = string.ascii_uppercase + string.digits
-            captcha_text = ''.join(random.choices(chars, k=4))
+            captcha_text = "".join(random.choices(chars, k=4))
 
             # 创建图片
             width, height = 120, 40
-            image = Image.new('RGB', (width, height), color='white')
+            image = Image.new("RGB", (width, height), color="white")
             draw = ImageDraw.Draw(image)
 
             # 尝试使用系统字体，如果失败则使用默认字体
@@ -1942,7 +2340,7 @@ class DBManager:
                 color = (
                     random.randint(0, 100),
                     random.randint(0, 100),
-                    random.randint(0, 100)
+                    random.randint(0, 100),
                 )
 
                 # 随机位置（稍微偏移）
@@ -1955,17 +2353,32 @@ class DBManager:
             for _ in range(3):
                 start = (random.randint(0, width), random.randint(0, height))
                 end = (random.randint(0, width), random.randint(0, height))
-                draw.line([start, end], fill=(random.randint(100, 200), random.randint(100, 200), random.randint(100, 200)), width=1)
+                draw.line(
+                    [start, end],
+                    fill=(
+                        random.randint(100, 200),
+                        random.randint(100, 200),
+                        random.randint(100, 200),
+                    ),
+                    width=1,
+                )
 
             # 添加干扰点
             for _ in range(20):
                 x = random.randint(0, width)
                 y = random.randint(0, height)
-                draw.point((x, y), fill=(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)))
+                draw.point(
+                    (x, y),
+                    fill=(
+                        random.randint(0, 255),
+                        random.randint(0, 255),
+                        random.randint(0, 255),
+                    ),
+                )
 
             # 转换为base64
             buffer = io.BytesIO()
-            image.save(buffer, format='PNG')
+            image.save(buffer, format="PNG")
             img_base64 = base64.b64encode(buffer.getvalue()).decode()
 
             return captcha_text, f"data:image/png;base64,{img_base64}"
@@ -1973,10 +2386,12 @@ class DBManager:
         except Exception as e:
             logger.error(f"生成图形验证码失败: {e}")
             # 返回简单的文本验证码作为备用
-            simple_code = ''.join(random.choices(string.digits, k=4))
+            simple_code = "".join(random.choices(string.digits, k=4))
             return simple_code, ""
 
-    def save_captcha(self, session_id: str, captcha_text: str, expires_minutes: int = 5) -> bool:
+    def save_captcha(
+        self, session_id: str, captcha_text: str, expires_minutes: int = 5
+    ) -> bool:
         """保存图形验证码"""
         with self.lock:
             try:
@@ -1984,12 +2399,17 @@ class DBManager:
                 expires_at = time.time() + (expires_minutes * 60)
 
                 # 删除该session的旧验证码
-                cursor.execute('DELETE FROM captcha_codes WHERE session_id = ?', (session_id,))
+                cursor.execute(
+                    "DELETE FROM captcha_codes WHERE session_id = ?", (session_id,)
+                )
 
-                cursor.execute('''
+                cursor.execute(
+                    """
                 INSERT INTO captcha_codes (session_id, code, expires_at)
                 VALUES (?, ?, ?)
-                ''', (session_id, captcha_text.upper(), expires_at))
+                """,
+                    (session_id, captcha_text.upper(), expires_at),
+                )
 
                 self.conn.commit()
                 logger.debug(f"保存图形验证码成功: {session_id}")
@@ -2007,16 +2427,19 @@ class DBManager:
                 current_time = time.time()
 
                 # 查找有效的验证码
-                cursor.execute('''
+                cursor.execute(
+                    """
                 SELECT id FROM captcha_codes
                 WHERE session_id = ? AND code = ? AND expires_at > ?
                 ORDER BY created_at DESC LIMIT 1
-                ''', (session_id, user_input.upper(), current_time))
+                """,
+                    (session_id, user_input.upper(), current_time),
+                )
 
                 row = cursor.fetchone()
                 if row:
                     # 删除已使用的验证码
-                    cursor.execute('DELETE FROM captcha_codes WHERE id = ?', (row[0],))
+                    cursor.execute("DELETE FROM captcha_codes WHERE id = ?", (row[0],))
                     self.conn.commit()
                     logger.debug(f"图形验证码验证成功: {session_id}")
                     return True
@@ -2027,17 +2450,26 @@ class DBManager:
                 logger.error(f"验证图形验证码失败: {e}")
                 return False
 
-    def save_verification_code(self, email: str, code: str, code_type: str = 'register', expires_minutes: int = 10) -> bool:
+    def save_verification_code(
+        self,
+        email: str,
+        code: str,
+        code_type: str = "register",
+        expires_minutes: int = 10,
+    ) -> bool:
         """保存邮箱验证码"""
         with self.lock:
             try:
                 cursor = self.conn.cursor()
                 expires_at = time.time() + (expires_minutes * 60)
 
-                cursor.execute('''
+                cursor.execute(
+                    """
                 INSERT INTO email_verifications (email, code, type, expires_at)
                 VALUES (?, ?, ?, ?)
-                ''', (email, code, code_type, expires_at))
+                """,
+                    (email, code, code_type, expires_at),
+                )
 
                 self.conn.commit()
                 logger.info(f"保存验证码成功: {email} ({code_type})")
@@ -2047,7 +2479,9 @@ class DBManager:
                 self.conn.rollback()
                 return False
 
-    def verify_email_code(self, email: str, code: str, code_type: str = 'register') -> bool:
+    def verify_email_code(
+        self, email: str, code: str, code_type: str = "register"
+    ) -> bool:
         """验证邮箱验证码"""
         with self.lock:
             try:
@@ -2055,18 +2489,24 @@ class DBManager:
                 current_time = time.time()
 
                 # 查找有效的验证码
-                cursor.execute('''
+                cursor.execute(
+                    """
                 SELECT id FROM email_verifications
                 WHERE email = ? AND code = ? AND type = ? AND expires_at > ? AND used = FALSE
                 ORDER BY created_at DESC LIMIT 1
-                ''', (email, code, code_type, current_time))
+                """,
+                    (email, code, code_type, current_time),
+                )
 
                 row = cursor.fetchone()
                 if row:
                     # 标记验证码为已使用
-                    cursor.execute('''
+                    cursor.execute(
+                        """
                     UPDATE email_verifications SET used = TRUE WHERE id = ?
-                    ''', (row[0],))
+                    """,
+                        (row[0],),
+                    )
                     self.conn.commit()
                     logger.info(f"验证码验证成功: {email} ({code_type})")
                     return True
@@ -2106,15 +2546,17 @@ class DBManager:
             # 使用GET请求发送邮件
             api_url = "https://dy.zhinianboke.com/api/emailSend"
             params = {
-                'subject': subject,
-                'receiveUser': email,
-                'sendHtml': text_content
+                "subject": subject,
+                "receiveUser": email,
+                "sendHtml": text_content,
             }
 
             async with aiohttp.ClientSession() as session:
                 try:
                     logger.info(f"发送验证码邮件: {email}")
-                    async with session.get(api_url, params=params, timeout=15) as response:
+                    async with session.get(
+                        api_url, params=params, timeout=15
+                    ) as response:
                         response_text = await response.text()
                         logger.info(f"邮件API响应: {response.status}")
 
@@ -2122,7 +2564,9 @@ class DBManager:
                             logger.info(f"验证码邮件发送成功: {email}")
                             return True
                         else:
-                            logger.error(f"验证码邮件发送失败: {email}, 状态码: {response.status}, 响应: {response_text[:200]}")
+                            logger.error(
+                                f"验证码邮件发送失败: {email}, 状态码: {response.status}, 响应: {response_text[:200]}"
+                            )
                             return False
                 except Exception as e:
                     logger.error(f"邮件发送异常: {email}, 错误: {e}")
@@ -2134,11 +2578,21 @@ class DBManager:
 
     # ==================== 卡券管理方法 ====================
 
-    def create_card(self, name: str, card_type: str, api_config=None,
-                   text_content: str = None, data_content: str = None,
-                   description: str = None, enabled: bool = True, delay_seconds: int = 0,
-                   is_multi_spec: bool = False, spec_name: str = None, spec_value: str = None,
-                   user_id: int = None):
+    def create_card(
+        self,
+        name: str,
+        card_type: str,
+        api_config=None,
+        text_content: str = None,
+        data_content: str = None,
+        description: str = None,
+        enabled: bool = True,
+        delay_seconds: int = 0,
+        is_multi_spec: bool = False,
+        spec_name: str = None,
+        spec_value: str = None,
+        user_id: int = None,
+    ):
         """创建新卡券（支持多规格）"""
         with self.lock:
             try:
@@ -2149,20 +2603,28 @@ class DBManager:
 
                     # 检查唯一性：卡券名称+规格名称+规格值
                     cursor = self.conn.cursor()
-                    cursor.execute('''
+                    cursor.execute(
+                        """
                     SELECT COUNT(*) FROM cards
                     WHERE name = ? AND spec_name = ? AND spec_value = ? AND user_id = ?
-                    ''', (name, spec_name, spec_value, user_id))
+                    """,
+                        (name, spec_name, spec_value, user_id),
+                    )
 
                     if cursor.fetchone()[0] > 0:
-                        raise ValueError(f"卡券已存在：{name} - {spec_name}:{spec_value}")
+                        raise ValueError(
+                            f"卡券已存在：{name} - {spec_name}:{spec_value}"
+                        )
                 else:
                     # 检查唯一性：仅卡券名称
                     cursor = self.conn.cursor()
-                    cursor.execute('''
+                    cursor.execute(
+                        """
                     SELECT COUNT(*) FROM cards
                     WHERE name = ? AND (is_multi_spec = 0 OR is_multi_spec IS NULL) AND user_id = ?
-                    ''', (name, user_id))
+                    """,
+                        (name, user_id),
+                    )
 
                     if cursor.fetchone()[0] > 0:
                         raise ValueError(f"卡券名称已存在：{name}")
@@ -2172,23 +2634,40 @@ class DBManager:
                 if api_config is not None:
                     if isinstance(api_config, dict):
                         import json
+
                         api_config_str = json.dumps(api_config)
                     else:
                         api_config_str = str(api_config)
 
-                cursor.execute('''
+                cursor.execute(
+                    """
                 INSERT INTO cards (name, type, api_config, text_content, data_content,
                                  description, enabled, delay_seconds, is_multi_spec,
                                  spec_name, spec_value, user_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (name, card_type, api_config_str, text_content, data_content,
-                      description, enabled, delay_seconds, is_multi_spec,
-                      spec_name, spec_value, user_id))
+                """,
+                    (
+                        name,
+                        card_type,
+                        api_config_str,
+                        text_content,
+                        data_content,
+                        description,
+                        enabled,
+                        delay_seconds,
+                        is_multi_spec,
+                        spec_name,
+                        spec_value,
+                        user_id,
+                    ),
+                )
                 self.conn.commit()
                 card_id = cursor.lastrowid
 
                 if is_multi_spec:
-                    logger.info(f"创建多规格卡券成功: {name} - {spec_name}:{spec_value} (ID: {card_id})")
+                    logger.info(
+                        f"创建多规格卡券成功: {name} - {spec_name}:{spec_value} (ID: {card_id})"
+                    )
                 else:
                     logger.info(f"创建卡券成功: {name} (ID: {card_id})")
                 return card_id
@@ -2202,22 +2681,27 @@ class DBManager:
             try:
                 cursor = self.conn.cursor()
                 if user_id is not None:
-                    cursor.execute('''
+                    cursor.execute(
+                        """
                     SELECT id, name, type, api_config, text_content, data_content,
                            description, enabled, delay_seconds, is_multi_spec,
                            spec_name, spec_value, created_at, updated_at
                     FROM cards
                     WHERE user_id = ?
                     ORDER BY created_at DESC
-                    ''', (user_id,))
+                    """,
+                        (user_id,),
+                    )
                 else:
-                    cursor.execute('''
+                    cursor.execute(
+                        """
                     SELECT id, name, type, api_config, text_content, data_content,
                            description, enabled, delay_seconds, is_multi_spec,
                            spec_name, spec_value, created_at, updated_at
                     FROM cards
                     ORDER BY created_at DESC
-                    ''')
+                    """
+                    )
 
                 cards = []
                 for row in cursor.fetchall():
@@ -2226,27 +2710,32 @@ class DBManager:
                     if api_config:
                         try:
                             import json
+
                             api_config = json.loads(api_config)
                         except (json.JSONDecodeError, TypeError):
                             # 如果解析失败，保持原始字符串
                             pass
 
-                    cards.append({
-                        'id': row[0],
-                        'name': row[1],
-                        'type': row[2],
-                        'api_config': api_config,
-                        'text_content': row[4],
-                        'data_content': row[5],
-                        'description': row[6],
-                        'enabled': bool(row[7]),
-                        'delay_seconds': row[8] or 0,
-                        'is_multi_spec': bool(row[9]) if row[9] is not None else False,
-                        'spec_name': row[10],
-                        'spec_value': row[11],
-                        'created_at': row[12],
-                        'updated_at': row[13]
-                    })
+                    cards.append(
+                        {
+                            "id": row[0],
+                            "name": row[1],
+                            "type": row[2],
+                            "api_config": api_config,
+                            "text_content": row[4],
+                            "data_content": row[5],
+                            "description": row[6],
+                            "enabled": bool(row[7]),
+                            "delay_seconds": row[8] or 0,
+                            "is_multi_spec": (
+                                bool(row[9]) if row[9] is not None else False
+                            ),
+                            "spec_name": row[10],
+                            "spec_value": row[11],
+                            "created_at": row[12],
+                            "updated_at": row[13],
+                        }
+                    )
 
                 return cards
             except Exception as e:
@@ -2259,19 +2748,25 @@ class DBManager:
             try:
                 cursor = self.conn.cursor()
                 if user_id is not None:
-                    cursor.execute('''
+                    cursor.execute(
+                        """
                     SELECT id, name, type, api_config, text_content, data_content,
                            description, enabled, delay_seconds, is_multi_spec,
                            spec_name, spec_value, created_at, updated_at
                     FROM cards WHERE id = ? AND user_id = ?
-                    ''', (card_id, user_id))
+                    """,
+                        (card_id, user_id),
+                    )
                 else:
-                    cursor.execute('''
+                    cursor.execute(
+                        """
                     SELECT id, name, type, api_config, text_content, data_content,
                            description, enabled, delay_seconds, is_multi_spec,
                            spec_name, spec_value, created_at, updated_at
                     FROM cards WHERE id = ?
-                    ''', (card_id,))
+                    """,
+                        (card_id,),
+                    )
 
                 row = cursor.fetchone()
                 if row:
@@ -2280,36 +2775,48 @@ class DBManager:
                     if api_config:
                         try:
                             import json
+
                             api_config = json.loads(api_config)
                         except (json.JSONDecodeError, TypeError):
                             # 如果解析失败，保持原始字符串
                             pass
 
                     return {
-                        'id': row[0],
-                        'name': row[1],
-                        'type': row[2],
-                        'api_config': api_config,
-                        'text_content': row[4],
-                        'data_content': row[5],
-                        'description': row[6],
-                        'enabled': bool(row[7]),
-                        'delay_seconds': row[8] or 0,
-                        'is_multi_spec': bool(row[9]) if row[9] is not None else False,
-                        'spec_name': row[10],
-                        'spec_value': row[11],
-                        'created_at': row[12],
-                        'updated_at': row[13]
+                        "id": row[0],
+                        "name": row[1],
+                        "type": row[2],
+                        "api_config": api_config,
+                        "text_content": row[4],
+                        "data_content": row[5],
+                        "description": row[6],
+                        "enabled": bool(row[7]),
+                        "delay_seconds": row[8] or 0,
+                        "is_multi_spec": bool(row[9]) if row[9] is not None else False,
+                        "spec_name": row[10],
+                        "spec_value": row[11],
+                        "created_at": row[12],
+                        "updated_at": row[13],
                     }
                 return None
             except Exception as e:
                 logger.error(f"获取卡券失败: {e}")
                 return None
 
-    def update_card(self, card_id: int, name: str = None, card_type: str = None,
-                   api_config=None, text_content: str = None, data_content: str = None,
-                   description: str = None, enabled: bool = None, delay_seconds: int = None,
-                   is_multi_spec: bool = None, spec_name: str = None, spec_value: str = None):
+    def update_card(
+        self,
+        card_id: int,
+        name: str = None,
+        card_type: str = None,
+        api_config=None,
+        text_content: str = None,
+        data_content: str = None,
+        description: str = None,
+        enabled: bool = None,
+        delay_seconds: int = None,
+        is_multi_spec: bool = None,
+        spec_name: str = None,
+        spec_value: str = None,
+    ):
         """更新卡券"""
         with self.lock:
             try:
@@ -2318,6 +2825,7 @@ class DBManager:
                 if api_config is not None:
                     if isinstance(api_config, dict):
                         import json
+
                         api_config_str = json.dumps(api_config)
                     else:
                         api_config_str = str(api_config)
@@ -2385,19 +2893,31 @@ class DBManager:
 
     # ==================== 自动发货规则方法 ====================
 
-    def create_delivery_rule(self, keyword: str, card_id: int, delivery_count: int = 1,
-                           enabled: bool = True, description: str = None, user_id: int = None):
+    def create_delivery_rule(
+        self,
+        keyword: str,
+        card_id: int,
+        delivery_count: int = 1,
+        enabled: bool = True,
+        description: str = None,
+        user_id: int = None,
+    ):
         """创建发货规则"""
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 INSERT INTO delivery_rules (keyword, card_id, delivery_count, enabled, description, user_id)
                 VALUES (?, ?, ?, ?, ?, ?)
-                ''', (keyword, card_id, delivery_count, enabled, description, user_id))
+                """,
+                    (keyword, card_id, delivery_count, enabled, description, user_id),
+                )
                 self.conn.commit()
                 rule_id = cursor.lastrowid
-                logger.info(f"创建发货规则成功: {keyword} -> 卡券ID {card_id} (规则ID: {rule_id})")
+                logger.info(
+                    f"创建发货规则成功: {keyword} -> 卡券ID {card_id} (规则ID: {rule_id})"
+                )
                 return rule_id
             except Exception as e:
                 logger.error(f"创建发货规则失败: {e}")
@@ -2409,7 +2929,8 @@ class DBManager:
             try:
                 cursor = self.conn.cursor()
                 if user_id is not None:
-                    cursor.execute('''
+                    cursor.execute(
+                        """
                     SELECT dr.id, dr.keyword, dr.card_id, dr.delivery_count, dr.enabled,
                            dr.description, dr.delivery_times, dr.created_at, dr.updated_at,
                            c.name as card_name, c.type as card_type,
@@ -2418,9 +2939,12 @@ class DBManager:
                     LEFT JOIN cards c ON dr.card_id = c.id
                     WHERE dr.user_id = ?
                     ORDER BY dr.created_at DESC
-                    ''', (user_id,))
+                    """,
+                        (user_id,),
+                    )
                 else:
-                    cursor.execute('''
+                    cursor.execute(
+                        """
                     SELECT dr.id, dr.keyword, dr.card_id, dr.delivery_count, dr.enabled,
                            dr.description, dr.delivery_times, dr.created_at, dr.updated_at,
                            c.name as card_name, c.type as card_type,
@@ -2428,26 +2952,31 @@ class DBManager:
                     FROM delivery_rules dr
                     LEFT JOIN cards c ON dr.card_id = c.id
                     ORDER BY dr.created_at DESC
-                    ''')
+                    """
+                    )
 
                 rules = []
                 for row in cursor.fetchall():
-                    rules.append({
-                        'id': row[0],
-                        'keyword': row[1],
-                        'card_id': row[2],
-                        'delivery_count': row[3],
-                        'enabled': bool(row[4]),
-                        'description': row[5],
-                        'delivery_times': row[6],
-                        'created_at': row[7],
-                        'updated_at': row[8],
-                        'card_name': row[9],
-                        'card_type': row[10],
-                        'is_multi_spec': bool(row[11]) if row[11] is not None else False,
-                        'spec_name': row[12],
-                        'spec_value': row[13]
-                    })
+                    rules.append(
+                        {
+                            "id": row[0],
+                            "keyword": row[1],
+                            "card_id": row[2],
+                            "delivery_count": row[3],
+                            "enabled": bool(row[4]),
+                            "description": row[5],
+                            "delivery_times": row[6],
+                            "created_at": row[7],
+                            "updated_at": row[8],
+                            "card_name": row[9],
+                            "card_type": row[10],
+                            "is_multi_spec": (
+                                bool(row[11]) if row[11] is not None else False
+                            ),
+                            "spec_name": row[12],
+                            "spec_value": row[13],
+                        }
+                    )
 
                 return rules
             except Exception as e:
@@ -2460,7 +2989,8 @@ class DBManager:
             try:
                 cursor = self.conn.cursor()
                 # 使用更灵活的匹配方式：既支持商品内容包含关键字，也支持关键字包含在商品内容中
-                cursor.execute('''
+                cursor.execute(
+                    """
                 SELECT dr.id, dr.keyword, dr.card_id, dr.delivery_count, dr.enabled,
                        dr.description, dr.delivery_times,
                        c.name as card_name, c.type as card_type, c.api_config,
@@ -2476,7 +3006,9 @@ class DBManager:
                         ELSE LENGTH(dr.keyword) / 2
                     END DESC,
                     dr.id ASC
-                ''', (keyword, keyword, keyword))
+                """,
+                    (keyword, keyword, keyword),
+                )
 
                 rules = []
                 for row in cursor.fetchall():
@@ -2485,28 +3017,31 @@ class DBManager:
                     if api_config:
                         try:
                             import json
+
                             api_config = json.loads(api_config)
                         except (json.JSONDecodeError, TypeError):
                             # 如果解析失败，保持原始字符串
                             pass
 
-                    rules.append({
-                        'id': row[0],
-                        'keyword': row[1],
-                        'card_id': row[2],
-                        'delivery_count': row[3],
-                        'enabled': bool(row[4]),
-                        'description': row[5],
-                        'delivery_times': row[6],
-                        'card_name': row[7],
-                        'card_type': row[8],
-                        'api_config': api_config,  # 修复字段名
-                        'text_content': row[10],
-                        'data_content': row[11],
-                        'card_enabled': bool(row[12]),
-                        'card_description': row[13],  # 卡券备注信息
-                        'card_delay_seconds': row[14] or 0  # 延时秒数
-                    })
+                    rules.append(
+                        {
+                            "id": row[0],
+                            "keyword": row[1],
+                            "card_id": row[2],
+                            "delivery_count": row[3],
+                            "enabled": bool(row[4]),
+                            "description": row[5],
+                            "delivery_times": row[6],
+                            "card_name": row[7],
+                            "card_type": row[8],
+                            "api_config": api_config,  # 修复字段名
+                            "text_content": row[10],
+                            "data_content": row[11],
+                            "card_enabled": bool(row[12]),
+                            "card_description": row[13],  # 卡券备注信息
+                            "card_delay_seconds": row[14] or 0,  # 延时秒数
+                        }
+                    )
 
                 return rules
             except Exception as e:
@@ -2519,47 +3054,62 @@ class DBManager:
             try:
                 cursor = self.conn.cursor()
                 if user_id is not None:
-                    self._execute_sql(cursor, '''
+                    self._execute_sql(
+                        cursor,
+                        """
                     SELECT dr.id, dr.keyword, dr.card_id, dr.delivery_count, dr.enabled,
                            dr.description, dr.delivery_times, dr.created_at, dr.updated_at,
                            c.name as card_name, c.type as card_type
                     FROM delivery_rules dr
                     LEFT JOIN cards c ON dr.card_id = c.id
                     WHERE dr.id = ? AND dr.user_id = ?
-                    ''', (rule_id, user_id))
+                    """,
+                        (rule_id, user_id),
+                    )
                 else:
-                    self._execute_sql(cursor, '''
+                    self._execute_sql(
+                        cursor,
+                        """
                     SELECT dr.id, dr.keyword, dr.card_id, dr.delivery_count, dr.enabled,
                            dr.description, dr.delivery_times, dr.created_at, dr.updated_at,
                            c.name as card_name, c.type as card_type
                     FROM delivery_rules dr
                     LEFT JOIN cards c ON dr.card_id = c.id
                     WHERE dr.id = ?
-                    ''', (rule_id,))
+                    """,
+                        (rule_id,),
+                    )
 
                 row = cursor.fetchone()
                 if row:
                     return {
-                        'id': row[0],
-                        'keyword': row[1],
-                        'card_id': row[2],
-                        'delivery_count': row[3],
-                        'enabled': bool(row[4]),
-                        'description': row[5],
-                        'delivery_times': row[6],
-                        'created_at': row[7],
-                        'updated_at': row[8],
-                        'card_name': row[9],
-                        'card_type': row[10]
+                        "id": row[0],
+                        "keyword": row[1],
+                        "card_id": row[2],
+                        "delivery_count": row[3],
+                        "enabled": bool(row[4]),
+                        "description": row[5],
+                        "delivery_times": row[6],
+                        "created_at": row[7],
+                        "updated_at": row[8],
+                        "card_name": row[9],
+                        "card_type": row[10],
                     }
                 return None
             except Exception as e:
                 logger.error(f"获取发货规则失败: {e}")
                 return None
 
-    def update_delivery_rule(self, rule_id: int, keyword: str = None, card_id: int = None,
-                           delivery_count: int = None, enabled: bool = None,
-                           description: str = None, user_id: int = None):
+    def update_delivery_rule(
+        self,
+        rule_id: int,
+        keyword: str = None,
+        card_id: int = None,
+        delivery_count: int = None,
+        enabled: bool = None,
+        description: str = None,
+        user_id: int = None,
+    ):
         """更新发货规则（支持用户隔离）"""
         with self.lock:
             try:
@@ -2616,17 +3166,22 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 UPDATE delivery_rules
                 SET delivery_times = delivery_times + 1, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
-                ''', (rule_id,))
+                """,
+                    (rule_id,),
+                )
                 self.conn.commit()
                 logger.debug(f"发货规则 {rule_id} 发货次数已增加")
             except Exception as e:
                 logger.error(f"更新发货次数失败: {e}")
 
-    def get_delivery_rules_by_keyword_and_spec(self, keyword: str, spec_name: str = None, spec_value: str = None):
+    def get_delivery_rules_by_keyword_and_spec(
+        self, keyword: str, spec_name: str = None, spec_value: str = None
+    ):
         """根据关键字和规格信息获取匹配的发货规则（支持多规格）"""
         with self.lock:
             try:
@@ -2634,7 +3189,8 @@ class DBManager:
 
                 # 优先匹配：卡券名称+规格名称+规格值
                 if spec_name and spec_value:
-                    cursor.execute('''
+                    cursor.execute(
+                        """
                     SELECT dr.id, dr.keyword, dr.card_id, dr.delivery_count, dr.enabled,
                            dr.description, dr.delivery_times,
                            c.name as card_name, c.type as card_type, c.api_config,
@@ -2652,7 +3208,9 @@ class DBManager:
                             ELSE LENGTH(dr.keyword) / 2
                         END DESC,
                         dr.delivery_times ASC
-                    ''', (keyword, keyword, spec_name, spec_value, keyword))
+                    """,
+                        (keyword, keyword, spec_name, spec_value, keyword),
+                    )
 
                     rules = []
                     for row in cursor.fetchall():
@@ -2661,38 +3219,44 @@ class DBManager:
                         if api_config:
                             try:
                                 import json
+
                                 api_config = json.loads(api_config)
                             except (json.JSONDecodeError, TypeError):
                                 # 如果解析失败，保持原始字符串
                                 pass
 
-                        rules.append({
-                            'id': row[0],
-                            'keyword': row[1],
-                            'card_id': row[2],
-                            'delivery_count': row[3],
-                            'enabled': bool(row[4]),
-                            'description': row[5],
-                            'delivery_times': row[6] or 0,
-                            'card_name': row[7],
-                            'card_type': row[8],
-                            'api_config': api_config,
-                            'text_content': row[10],
-                            'data_content': row[11],
-                            'card_enabled': bool(row[12]),
-                            'card_description': row[13],
-                            'card_delay_seconds': row[14] or 0,
-                            'is_multi_spec': bool(row[15]),
-                            'spec_name': row[16],
-                            'spec_value': row[17]
-                        })
+                        rules.append(
+                            {
+                                "id": row[0],
+                                "keyword": row[1],
+                                "card_id": row[2],
+                                "delivery_count": row[3],
+                                "enabled": bool(row[4]),
+                                "description": row[5],
+                                "delivery_times": row[6] or 0,
+                                "card_name": row[7],
+                                "card_type": row[8],
+                                "api_config": api_config,
+                                "text_content": row[10],
+                                "data_content": row[11],
+                                "card_enabled": bool(row[12]),
+                                "card_description": row[13],
+                                "card_delay_seconds": row[14] or 0,
+                                "is_multi_spec": bool(row[15]),
+                                "spec_name": row[16],
+                                "spec_value": row[17],
+                            }
+                        )
 
                     if rules:
-                        logger.info(f"找到多规格匹配规则: {keyword} - {spec_name}:{spec_value}")
+                        logger.info(
+                            f"找到多规格匹配规则: {keyword} - {spec_name}:{spec_value}"
+                        )
                         return rules
 
                 # 兜底匹配：仅卡券名称
-                cursor.execute('''
+                cursor.execute(
+                    """
                 SELECT dr.id, dr.keyword, dr.card_id, dr.delivery_count, dr.enabled,
                        dr.description, dr.delivery_times,
                        c.name as card_name, c.type as card_type, c.api_config,
@@ -2710,7 +3274,9 @@ class DBManager:
                         ELSE LENGTH(dr.keyword) / 2
                     END DESC,
                     dr.delivery_times ASC
-                ''', (keyword, keyword, keyword))
+                """,
+                    (keyword, keyword, keyword),
+                )
 
                 rules = []
                 for row in cursor.fetchall():
@@ -2719,31 +3285,36 @@ class DBManager:
                     if api_config:
                         try:
                             import json
+
                             api_config = json.loads(api_config)
                         except (json.JSONDecodeError, TypeError):
                             # 如果解析失败，保持原始字符串
                             pass
 
-                    rules.append({
-                        'id': row[0],
-                        'keyword': row[1],
-                        'card_id': row[2],
-                        'delivery_count': row[3],
-                        'enabled': bool(row[4]),
-                        'description': row[5],
-                        'delivery_times': row[6] or 0,
-                        'card_name': row[7],
-                        'card_type': row[8],
-                        'api_config': api_config,
-                        'text_content': row[10],
-                        'data_content': row[11],
-                        'card_enabled': bool(row[12]),
-                        'card_description': row[13],
-                        'card_delay_seconds': row[14] or 0,
-                        'is_multi_spec': bool(row[15]) if row[15] is not None else False,
-                        'spec_name': row[16],
-                        'spec_value': row[17]
-                    })
+                    rules.append(
+                        {
+                            "id": row[0],
+                            "keyword": row[1],
+                            "card_id": row[2],
+                            "delivery_count": row[3],
+                            "enabled": bool(row[4]),
+                            "description": row[5],
+                            "delivery_times": row[6] or 0,
+                            "card_name": row[7],
+                            "card_type": row[8],
+                            "api_config": api_config,
+                            "text_content": row[10],
+                            "data_content": row[11],
+                            "card_enabled": bool(row[12]),
+                            "card_description": row[13],
+                            "card_delay_seconds": row[14] or 0,
+                            "is_multi_spec": (
+                                bool(row[15]) if row[15] is not None else False
+                            ),
+                            "spec_name": row[16],
+                            "spec_value": row[17],
+                        }
+                    )
 
                 if rules:
                     logger.info(f"找到兜底匹配规则: {keyword}")
@@ -2781,9 +3352,15 @@ class DBManager:
             try:
                 cursor = self.conn.cursor()
                 if user_id is not None:
-                    self._execute_sql(cursor, "DELETE FROM delivery_rules WHERE id = ? AND user_id = ?", (rule_id, user_id))
+                    self._execute_sql(
+                        cursor,
+                        "DELETE FROM delivery_rules WHERE id = ? AND user_id = ?",
+                        (rule_id, user_id),
+                    )
                 else:
-                    self._execute_sql(cursor, "DELETE FROM delivery_rules WHERE id = ?", (rule_id,))
+                    self._execute_sql(
+                        cursor, "DELETE FROM delivery_rules WHERE id = ?", (rule_id,)
+                    )
 
                 if cursor.rowcount > 0:
                     self.conn.commit()
@@ -2804,7 +3381,11 @@ class DBManager:
                 cursor = self.conn.cursor()
 
                 # 获取卡券的批量数据
-                self._execute_sql(cursor, "SELECT data_content FROM cards WHERE id = ? AND type = 'data'", (card_id,))
+                self._execute_sql(
+                    cursor,
+                    "SELECT data_content FROM cards WHERE id = ? AND type = 'data'",
+                    (card_id,),
+                )
                 result = cursor.fetchone()
 
                 if not result or not result[0]:
@@ -2812,7 +3393,9 @@ class DBManager:
                     return None
 
                 data_content = result[0]
-                lines = [line.strip() for line in data_content.split('\n') if line.strip()]
+                lines = [
+                    line.strip() for line in data_content.split("\n") if line.strip()
+                ]
 
                 if not lines:
                     logger.warning(f"卡券 {card_id} 批量数据为空")
@@ -2823,17 +3406,22 @@ class DBManager:
 
                 # 移除第一条数据，更新数据库
                 remaining_lines = lines[1:]
-                new_data_content = '\n'.join(remaining_lines)
+                new_data_content = "\n".join(remaining_lines)
 
-                cursor.execute('''
+                cursor.execute(
+                    """
                 UPDATE cards
                 SET data_content = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
-                ''', (new_data_content, card_id))
+                """,
+                    (new_data_content, card_id),
+                )
 
                 self.conn.commit()
 
-                logger.info(f"消费批量数据成功: 卡券ID={card_id}, 剩余={len(remaining_lines)}条")
+                logger.info(
+                    f"消费批量数据成功: 卡券ID={card_id}, 剩余={len(remaining_lines)}条"
+                )
                 return first_line
 
             except Exception as e:
@@ -2843,9 +3431,16 @@ class DBManager:
 
     # ==================== 商品信息管理 ====================
 
-    def save_item_basic_info(self, cookie_id: str, item_id: str, item_title: str = None,
-                            item_description: str = None, item_category: str = None,
-                            item_price: str = None, item_detail: str = None) -> bool:
+    def save_item_basic_info(
+        self,
+        cookie_id: str,
+        item_id: str,
+        item_title: str = None,
+        item_description: str = None,
+        item_category: str = None,
+        item_price: str = None,
+        item_detail: str = None,
+    ) -> bool:
         """保存或更新商品基本信息，使用原子操作避免并发问题
 
         Args:
@@ -2866,12 +3461,22 @@ class DBManager:
 
                 # 使用 INSERT OR IGNORE + UPDATE 的原子操作模式
                 # 首先尝试插入，如果已存在则忽略
-                cursor.execute('''
+                cursor.execute(
+                    """
                 INSERT OR IGNORE INTO item_info (cookie_id, item_id, item_title, item_description,
                                                item_category, item_price, item_detail, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                ''', (cookie_id, item_id, item_title or '', item_description or '',
-                      item_category or '', item_price or '', item_detail or ''))
+                """,
+                    (
+                        cookie_id,
+                        item_id,
+                        item_title or "",
+                        item_description or "",
+                        item_category or "",
+                        item_price or "",
+                        item_detail or "",
+                    ),
+                )
 
                 # 如果是新插入的记录，直接返回成功
                 if cursor.rowcount > 0:
@@ -2885,24 +3490,34 @@ class DBManager:
 
                 # 使用 CASE WHEN 语句进行条件更新，避免覆盖现有数据
                 if item_title:
-                    update_parts.append("item_title = CASE WHEN (item_title IS NULL OR item_title = '') THEN ? ELSE item_title END")
+                    update_parts.append(
+                        "item_title = CASE WHEN (item_title IS NULL OR item_title = '') THEN ? ELSE item_title END"
+                    )
                     params.append(item_title)
 
                 if item_description:
-                    update_parts.append("item_description = CASE WHEN (item_description IS NULL OR item_description = '') THEN ? ELSE item_description END")
+                    update_parts.append(
+                        "item_description = CASE WHEN (item_description IS NULL OR item_description = '') THEN ? ELSE item_description END"
+                    )
                     params.append(item_description)
 
                 if item_category:
-                    update_parts.append("item_category = CASE WHEN (item_category IS NULL OR item_category = '') THEN ? ELSE item_category END")
+                    update_parts.append(
+                        "item_category = CASE WHEN (item_category IS NULL OR item_category = '') THEN ? ELSE item_category END"
+                    )
                     params.append(item_category)
 
                 if item_price:
-                    update_parts.append("item_price = CASE WHEN (item_price IS NULL OR item_price = '') THEN ? ELSE item_price END")
+                    update_parts.append(
+                        "item_price = CASE WHEN (item_price IS NULL OR item_price = '') THEN ? ELSE item_price END"
+                    )
                     params.append(item_price)
 
                 # 对于item_detail，只有在现有值为空时才更新
                 if item_detail:
-                    update_parts.append("item_detail = CASE WHEN (item_detail IS NULL OR item_detail = '' OR TRIM(item_detail) = '') THEN ? ELSE item_detail END")
+                    update_parts.append(
+                        "item_detail = CASE WHEN (item_detail IS NULL OR item_detail = '' OR TRIM(item_detail) = '') THEN ? ELSE item_detail END"
+                    )
                     params.append(item_detail)
 
                 if update_parts:
@@ -2925,7 +3540,7 @@ class DBManager:
             self.conn.rollback()
             return False
 
-    def save_item_info(self, cookie_id: str, item_id: str, item_data = None) -> bool:
+    def save_item_info(self, cookie_id: str, item_id: str, item_data=None) -> bool:
         """保存或更新商品信息
 
         Args:
@@ -2944,7 +3559,7 @@ class DBManager:
 
             # 如果是字典类型，检查是否有标题信息
             if isinstance(item_data, dict):
-                title = item_data.get('title', '').strip()
+                title = item_data.get("title", "").strip()
                 if not title:
                     logger.debug(f"跳过保存商品信息：缺少商品标题 - {item_id}")
                     return False
@@ -2958,10 +3573,13 @@ class DBManager:
                 cursor = self.conn.cursor()
 
                 # 检查商品是否已存在
-                cursor.execute('''
+                cursor.execute(
+                    """
                 SELECT id, item_detail FROM item_info
                 WHERE cookie_id = ? AND item_id = ?
-                ''', (cookie_id, item_id))
+                """,
+                    (cookie_id, item_id),
+                )
 
                 existing = cursor.fetchone()
 
@@ -2970,26 +3588,33 @@ class DBManager:
                     if item_data is not None and item_data:
                         # 处理字符串类型的详情数据
                         if isinstance(item_data, str):
-                            cursor.execute('''
+                            cursor.execute(
+                                """
                             UPDATE item_info SET
                                 item_detail = ?, updated_at = CURRENT_TIMESTAMP
                             WHERE cookie_id = ? AND item_id = ?
-                            ''', (item_data, cookie_id, item_id))
+                            """,
+                                (item_data, cookie_id, item_id),
+                            )
                         else:
                             # 处理字典类型的详情数据（向后兼容）
-                            cursor.execute('''
+                            cursor.execute(
+                                """
                             UPDATE item_info SET
                                 item_title = ?, item_description = ?, item_category = ?,
                                 item_price = ?, item_detail = ?, updated_at = CURRENT_TIMESTAMP
                             WHERE cookie_id = ? AND item_id = ?
-                            ''', (
-                                item_data.get('title', ''),
-                                item_data.get('description', ''),
-                                item_data.get('category', ''),
-                                item_data.get('price', ''),
-                                json.dumps(item_data, ensure_ascii=False),
-                                cookie_id, item_id
-                            ))
+                            """,
+                                (
+                                    item_data.get("title", ""),
+                                    item_data.get("description", ""),
+                                    item_data.get("category", ""),
+                                    item_data.get("price", ""),
+                                    json.dumps(item_data, ensure_ascii=False),
+                                    cookie_id,
+                                    item_id,
+                                ),
+                            )
                         logger.info(f"更新商品信息（覆盖）: {item_id}")
                     else:
                         # 如果商品详情没有数据，则不更新，只记录存在
@@ -2999,24 +3624,35 @@ class DBManager:
                     # 新增商品信息
                     if isinstance(item_data, str):
                         # 直接保存字符串详情
-                        cursor.execute('''
+                        cursor.execute(
+                            """
                         INSERT INTO item_info (cookie_id, item_id, item_detail)
                         VALUES (?, ?, ?)
-                        ''', (cookie_id, item_id, item_data))
+                        """,
+                            (cookie_id, item_id, item_data),
+                        )
                     else:
                         # 处理字典类型的详情数据（向后兼容）
-                        cursor.execute('''
+                        cursor.execute(
+                            """
                         INSERT INTO item_info (cookie_id, item_id, item_title, item_description,
                                              item_category, item_price, item_detail)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
-                        ''', (
-                            cookie_id, item_id,
-                            item_data.get('title', '') if item_data else '',
-                            item_data.get('description', '') if item_data else '',
-                            item_data.get('category', '') if item_data else '',
-                            item_data.get('price', '') if item_data else '',
-                            json.dumps(item_data, ensure_ascii=False) if item_data else ''
-                        ))
+                        """,
+                            (
+                                cookie_id,
+                                item_id,
+                                item_data.get("title", "") if item_data else "",
+                                item_data.get("description", "") if item_data else "",
+                                item_data.get("category", "") if item_data else "",
+                                item_data.get("price", "") if item_data else "",
+                                (
+                                    json.dumps(item_data, ensure_ascii=False)
+                                    if item_data
+                                    else ""
+                                ),
+                            ),
+                        )
                     logger.info(f"新增商品信息: {item_id}")
 
                 self.conn.commit()
@@ -3040,10 +3676,13 @@ class DBManager:
         try:
             with self.lock:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 SELECT * FROM item_info
                 WHERE cookie_id = ? AND item_id = ?
-                ''', (cookie_id, item_id))
+                """,
+                    (cookie_id, item_id),
+                )
 
                 row = cursor.fetchone()
                 if row:
@@ -3051,11 +3690,13 @@ class DBManager:
                     item_info = dict(zip(columns, row))
 
                     # 解析item_detail JSON
-                    if item_info.get('item_detail'):
+                    if item_info.get("item_detail"):
                         try:
-                            item_info['item_detail_parsed'] = json.loads(item_info['item_detail'])
+                            item_info["item_detail_parsed"] = json.loads(
+                                item_info["item_detail"]
+                            )
                         except:
-                            item_info['item_detail_parsed'] = {}
+                            item_info["item_detail_parsed"] = {}
 
                     return item_info
                 return None
@@ -3064,16 +3705,21 @@ class DBManager:
             logger.error(f"获取商品信息失败: {e}")
             return None
 
-    def update_item_multi_spec_status(self, cookie_id: str, item_id: str, is_multi_spec: bool) -> bool:
+    def update_item_multi_spec_status(
+        self, cookie_id: str, item_id: str, is_multi_spec: bool
+    ) -> bool:
         """更新商品的多规格状态"""
         try:
             with self.lock:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 UPDATE item_info
                 SET is_multi_spec = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE cookie_id = ? AND item_id = ?
-                ''', (is_multi_spec, cookie_id, item_id))
+                """,
+                    (is_multi_spec, cookie_id, item_id),
+                )
 
                 if cursor.rowcount > 0:
                     self.conn.commit()
@@ -3093,10 +3739,13 @@ class DBManager:
         try:
             with self.lock:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 SELECT is_multi_spec FROM item_info
                 WHERE cookie_id = ? AND item_id = ?
-                ''', (cookie_id, item_id))
+                """,
+                    (cookie_id, item_id),
+                )
 
                 row = cursor.fetchone()
                 if row:
@@ -3119,11 +3768,14 @@ class DBManager:
         try:
             with self.lock:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 SELECT * FROM item_info
                 WHERE cookie_id = ?
                 ORDER BY updated_at DESC
-                ''', (cookie_id,))
+                """,
+                    (cookie_id,),
+                )
 
                 columns = [description[0] for description in cursor.description]
                 items = []
@@ -3132,11 +3784,13 @@ class DBManager:
                     item_info = dict(zip(columns, row))
 
                     # 解析item_detail JSON
-                    if item_info.get('item_detail'):
+                    if item_info.get("item_detail"):
                         try:
-                            item_info['item_detail_parsed'] = json.loads(item_info['item_detail'])
+                            item_info["item_detail_parsed"] = json.loads(
+                                item_info["item_detail"]
+                            )
                         except:
-                            item_info['item_detail_parsed'] = {}
+                            item_info["item_detail_parsed"] = {}
 
                     items.append(item_info)
 
@@ -3155,10 +3809,12 @@ class DBManager:
         try:
             with self.lock:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 SELECT * FROM item_info
                 ORDER BY updated_at DESC
-                ''')
+                """
+                )
 
                 columns = [description[0] for description in cursor.description]
                 items = []
@@ -3167,11 +3823,13 @@ class DBManager:
                     item_info = dict(zip(columns, row))
 
                     # 解析item_detail JSON
-                    if item_info.get('item_detail'):
+                    if item_info.get("item_detail"):
                         try:
-                            item_info['item_detail_parsed'] = json.loads(item_info['item_detail'])
+                            item_info["item_detail_parsed"] = json.loads(
+                                item_info["item_detail"]
+                            )
                         except:
-                            item_info['item_detail_parsed'] = {}
+                            item_info["item_detail_parsed"] = {}
 
                     items.append(item_info)
 
@@ -3181,7 +3839,9 @@ class DBManager:
             logger.error(f"获取所有商品信息失败: {e}")
             return []
 
-    def update_item_detail(self, cookie_id: str, item_id: str, item_detail: str) -> bool:
+    def update_item_detail(
+        self, cookie_id: str, item_id: str, item_detail: str
+    ) -> bool:
         """更新商品详情（不覆盖商品标题等基本信息）
 
         Args:
@@ -3196,11 +3856,14 @@ class DBManager:
             with self.lock:
                 cursor = self.conn.cursor()
                 # 只更新item_detail字段，不影响其他字段
-                cursor.execute('''
+                cursor.execute(
+                    """
                 UPDATE item_info SET
                     item_detail = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE cookie_id = ? AND item_id = ?
-                ''', (item_detail, cookie_id, item_id))
+                """,
+                    (item_detail, cookie_id, item_id),
+                )
 
                 if cursor.rowcount > 0:
                     self.conn.commit()
@@ -3215,7 +3878,9 @@ class DBManager:
             self.conn.rollback()
             return False
 
-    def update_item_title_only(self, cookie_id: str, item_id: str, item_title: str) -> bool:
+    def update_item_title_only(
+        self, cookie_id: str, item_id: str, item_title: str
+    ) -> bool:
         """仅更新商品标题（并发安全）
 
         Args:
@@ -3230,7 +3895,8 @@ class DBManager:
             with self.lock:
                 cursor = self.conn.cursor()
                 # 使用 INSERT OR REPLACE 确保记录存在，但只更新标题字段
-                cursor.execute('''
+                cursor.execute(
+                    """
                 INSERT INTO item_info (cookie_id, item_id, item_title, item_description,
                                      item_category, item_price, item_detail, created_at, updated_at)
                 VALUES (?, ?, ?,
@@ -3243,9 +3909,23 @@ class DBManager:
                 ON CONFLICT(cookie_id, item_id) DO UPDATE SET
                     item_title = excluded.item_title,
                     updated_at = CURRENT_TIMESTAMP
-                ''', (cookie_id, item_id, item_title,
-                      cookie_id, item_id, cookie_id, item_id, cookie_id, item_id,
-                      cookie_id, item_id, cookie_id, item_id))
+                """,
+                    (
+                        cookie_id,
+                        item_id,
+                        item_title,
+                        cookie_id,
+                        item_id,
+                        cookie_id,
+                        item_id,
+                        cookie_id,
+                        item_id,
+                        cookie_id,
+                        item_id,
+                        cookie_id,
+                        item_id,
+                    ),
+                )
 
                 self.conn.commit()
                 logger.info(f"更新商品标题成功: {item_id} - {item_title}")
@@ -3274,37 +3954,49 @@ class DBManager:
                 cursor = self.conn.cursor()
 
                 # 使用事务批量处理
-                cursor.execute('BEGIN TRANSACTION')
+                cursor.execute("BEGIN TRANSACTION")
 
                 for item_data in items_data:
                     try:
-                        cookie_id = item_data.get('cookie_id')
-                        item_id = item_data.get('item_id')
-                        item_title = item_data.get('item_title', '')
-                        item_description = item_data.get('item_description', '')
-                        item_category = item_data.get('item_category', '')
-                        item_price = item_data.get('item_price', '')
-                        item_detail = item_data.get('item_detail', '')
+                        cookie_id = item_data.get("cookie_id")
+                        item_id = item_data.get("item_id")
+                        item_title = item_data.get("item_title", "")
+                        item_description = item_data.get("item_description", "")
+                        item_category = item_data.get("item_category", "")
+                        item_price = item_data.get("item_price", "")
+                        item_detail = item_data.get("item_detail", "")
 
                         if not cookie_id or not item_id:
                             continue
 
                         # 验证：如果没有商品标题，则跳过保存
                         if not item_title or not item_title.strip():
-                            logger.debug(f"跳过批量保存商品信息：缺少商品标题 - {item_id}")
+                            logger.debug(
+                                f"跳过批量保存商品信息：缺少商品标题 - {item_id}"
+                            )
                             continue
 
                         # 使用 INSERT OR IGNORE + UPDATE 模式
-                        cursor.execute('''
+                        cursor.execute(
+                            """
                         INSERT OR IGNORE INTO item_info (cookie_id, item_id, item_title, item_description,
                                                        item_category, item_price, item_detail, created_at, updated_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                        ''', (cookie_id, item_id, item_title, item_description,
-                              item_category, item_price, item_detail))
+                        """,
+                            (
+                                cookie_id,
+                                item_id,
+                                item_title,
+                                item_description,
+                                item_category,
+                                item_price,
+                                item_detail,
+                            ),
+                        )
 
                         if cursor.rowcount == 0:
                             # 记录已存在，进行条件更新
-                            update_sql = '''
+                            update_sql = """
                             UPDATE item_info SET
                                 item_title = CASE WHEN (item_title IS NULL OR item_title = '') AND ? != '' THEN ? ELSE item_title END,
                                 item_description = CASE WHEN (item_description IS NULL OR item_description = '') AND ? != '' THEN ? ELSE item_description END,
@@ -3313,30 +4005,44 @@ class DBManager:
                                 item_detail = CASE WHEN (item_detail IS NULL OR item_detail = '' OR TRIM(item_detail) = '') AND ? != '' THEN ? ELSE item_detail END,
                                 updated_at = CURRENT_TIMESTAMP
                             WHERE cookie_id = ? AND item_id = ?
-                            '''
-                            self._execute_sql(cursor, update_sql, (
-                                item_title, item_title,
-                                item_description, item_description,
-                                item_category, item_category,
-                                item_price, item_price,
-                                item_detail, item_detail,
-                                cookie_id, item_id
-                            ))
+                            """
+                            self._execute_sql(
+                                cursor,
+                                update_sql,
+                                (
+                                    item_title,
+                                    item_title,
+                                    item_description,
+                                    item_description,
+                                    item_category,
+                                    item_category,
+                                    item_price,
+                                    item_price,
+                                    item_detail,
+                                    item_detail,
+                                    cookie_id,
+                                    item_id,
+                                ),
+                            )
 
                         success_count += 1
 
                     except Exception as item_e:
-                        logger.warning(f"批量保存单个商品失败 {item_data.get('item_id', 'unknown')}: {item_e}")
+                        logger.warning(
+                            f"批量保存单个商品失败 {item_data.get('item_id', 'unknown')}: {item_e}"
+                        )
                         continue
 
-                cursor.execute('COMMIT')
-                logger.info(f"批量保存商品信息完成: {success_count}/{len(items_data)} 个商品")
+                cursor.execute("COMMIT")
+                logger.info(
+                    f"批量保存商品信息完成: {success_count}/{len(items_data)} 个商品"
+                )
                 return success_count
 
         except Exception as e:
             logger.error(f"批量保存商品信息失败: {e}")
             try:
-                cursor.execute('ROLLBACK')
+                cursor.execute("ROLLBACK")
             except:
                 pass
             return success_count
@@ -3354,8 +4060,10 @@ class DBManager:
         try:
             with self.lock:
                 cursor = self.conn.cursor()
-                cursor.execute('DELETE FROM item_info WHERE cookie_id = ? AND item_id = ?',
-                             (cookie_id, item_id))
+                cursor.execute(
+                    "DELETE FROM item_info WHERE cookie_id = ? AND item_id = ?",
+                    (cookie_id, item_id),
+                )
 
                 if cursor.rowcount > 0:
                     self.conn.commit()
@@ -3386,35 +4094,41 @@ class DBManager:
         try:
             with self.lock:
                 cursor = self.conn.cursor()
-                cursor.execute('BEGIN TRANSACTION')
+                cursor.execute("BEGIN TRANSACTION")
 
                 for item_data in items_to_delete:
                     try:
-                        cookie_id = item_data.get('cookie_id')
-                        item_id = item_data.get('item_id')
+                        cookie_id = item_data.get("cookie_id")
+                        item_id = item_data.get("item_id")
 
                         if not cookie_id or not item_id:
                             continue
 
-                        cursor.execute('DELETE FROM item_info WHERE cookie_id = ? AND item_id = ?',
-                                     (cookie_id, item_id))
+                        cursor.execute(
+                            "DELETE FROM item_info WHERE cookie_id = ? AND item_id = ?",
+                            (cookie_id, item_id),
+                        )
 
                         if cursor.rowcount > 0:
                             success_count += 1
                             logger.debug(f"删除商品信息: {cookie_id} - {item_id}")
 
                     except Exception as item_e:
-                        logger.warning(f"删除单个商品失败 {item_data.get('item_id', 'unknown')}: {item_e}")
+                        logger.warning(
+                            f"删除单个商品失败 {item_data.get('item_id', 'unknown')}: {item_e}"
+                        )
                         continue
 
-                cursor.execute('COMMIT')
-                logger.info(f"批量删除商品信息完成: {success_count}/{len(items_to_delete)} 个商品")
+                cursor.execute("COMMIT")
+                logger.info(
+                    f"批量删除商品信息完成: {success_count}/{len(items_to_delete)} 个商品"
+                )
                 return success_count
 
         except Exception as e:
             logger.error(f"批量删除商品信息失败: {e}")
             try:
-                cursor.execute('ROLLBACK')
+                cursor.execute("ROLLBACK")
             except:
                 pass
             return success_count
@@ -3426,19 +4140,22 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 SELECT key, value, description, updated_at
                 FROM user_settings
                 WHERE user_id = ?
                 ORDER BY key
-                ''', (user_id,))
+                """,
+                    (user_id,),
+                )
 
                 settings = {}
                 for row in cursor.fetchall():
                     settings[row[0]] = {
-                        'value': row[1],
-                        'description': row[2],
-                        'updated_at': row[3]
+                        "value": row[1],
+                        "description": row[2],
+                        "updated_at": row[3],
                     }
 
                 return settings
@@ -3451,34 +4168,42 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 SELECT value, description, updated_at
                 FROM user_settings
                 WHERE user_id = ? AND key = ?
-                ''', (user_id, key))
+                """,
+                    (user_id, key),
+                )
 
                 row = cursor.fetchone()
                 if row:
                     return {
-                        'key': key,
-                        'value': row[0],
-                        'description': row[1],
-                        'updated_at': row[2]
+                        "key": key,
+                        "value": row[0],
+                        "description": row[1],
+                        "updated_at": row[2],
                     }
                 return None
             except Exception as e:
                 logger.error(f"获取用户设置失败: {e}")
                 return None
 
-    def set_user_setting(self, user_id: int, key: str, value: str, description: str = None):
+    def set_user_setting(
+        self, user_id: int, key: str, value: str, description: str = None
+    ):
         """设置用户配置"""
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 INSERT OR REPLACE INTO user_settings (user_id, key, value, description, updated_at)
                 VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-                ''', (user_id, key, value, description))
+                """,
+                    (user_id, key, value, description),
+                )
 
                 self.conn.commit()
                 logger.info(f"用户设置更新成功: user_id={user_id}, key={key}")
@@ -3495,21 +4220,25 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 SELECT id, username, email, created_at, updated_at
                 FROM users
                 ORDER BY created_at DESC
-                ''')
+                """
+                )
 
                 users = []
                 for row in cursor.fetchall():
-                    users.append({
-                        'id': row[0],
-                        'username': row[1],
-                        'email': row[2],
-                        'created_at': row[3],
-                        'updated_at': row[4]
-                    })
+                    users.append(
+                        {
+                            "id": row[0],
+                            "username": row[1],
+                            "email": row[2],
+                            "created_at": row[3],
+                            "updated_at": row[4],
+                        }
+                    )
 
                 return users
             except Exception as e:
@@ -3521,20 +4250,23 @@ class DBManager:
         with self.lock:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                 SELECT id, username, email, created_at, updated_at
                 FROM users
                 WHERE id = ?
-                ''', (user_id,))
+                """,
+                    (user_id,),
+                )
 
                 row = cursor.fetchone()
                 if row:
                     return {
-                        'id': row[0],
-                        'username': row[1],
-                        'email': row[2],
-                        'created_at': row[3],
-                        'updated_at': row[4]
+                        "id": row[0],
+                        "username": row[1],
+                        "email": row[2],
+                        "created_at": row[3],
+                        "updated_at": row[4],
                     }
                 return None
             except Exception as e:
@@ -3548,48 +4280,66 @@ class DBManager:
                 cursor = self.conn.cursor()
 
                 # 开始事务
-                cursor.execute('BEGIN TRANSACTION')
+                cursor.execute("BEGIN TRANSACTION")
 
                 # 删除用户相关的所有数据
                 # 1. 删除用户设置
-                cursor.execute('DELETE FROM user_settings WHERE user_id = ?', (user_id,))
+                cursor.execute(
+                    "DELETE FROM user_settings WHERE user_id = ?", (user_id,)
+                )
 
                 # 2. 删除用户的卡券
-                cursor.execute('DELETE FROM cards WHERE user_id = ?', (user_id,))
+                cursor.execute("DELETE FROM cards WHERE user_id = ?", (user_id,))
 
                 # 3. 删除用户的发货规则
-                cursor.execute('DELETE FROM delivery_rules WHERE user_id = ?', (user_id,))
+                cursor.execute(
+                    "DELETE FROM delivery_rules WHERE user_id = ?", (user_id,)
+                )
 
                 # 4. 删除用户的通知渠道
-                cursor.execute('DELETE FROM notification_channels WHERE user_id = ?', (user_id,))
+                cursor.execute(
+                    "DELETE FROM notification_channels WHERE user_id = ?", (user_id,)
+                )
 
                 # 5. 删除用户的Cookie
-                cursor.execute('DELETE FROM cookies WHERE user_id = ?', (user_id,))
+                cursor.execute("DELETE FROM cookies WHERE user_id = ?", (user_id,))
 
                 # 6. 删除用户的关键字
-                cursor.execute('DELETE FROM keywords WHERE cookie_id IN (SELECT id FROM cookies WHERE user_id = ?)', (user_id,))
+                cursor.execute(
+                    "DELETE FROM keywords WHERE cookie_id IN (SELECT id FROM cookies WHERE user_id = ?)",
+                    (user_id,),
+                )
 
                 # 7. 删除用户的默认回复
-                cursor.execute('DELETE FROM default_replies WHERE cookie_id IN (SELECT id FROM cookies WHERE user_id = ?)', (user_id,))
+                cursor.execute(
+                    "DELETE FROM default_replies WHERE cookie_id IN (SELECT id FROM cookies WHERE user_id = ?)",
+                    (user_id,),
+                )
 
                 # 8. 删除用户的AI回复设置
-                cursor.execute('DELETE FROM ai_reply_settings WHERE cookie_id IN (SELECT id FROM cookies WHERE user_id = ?)', (user_id,))
+                cursor.execute(
+                    "DELETE FROM ai_reply_settings WHERE cookie_id IN (SELECT id FROM cookies WHERE user_id = ?)",
+                    (user_id,),
+                )
 
                 # 9. 删除用户的消息通知
-                cursor.execute('DELETE FROM message_notifications WHERE cookie_id IN (SELECT id FROM cookies WHERE user_id = ?)', (user_id,))
+                cursor.execute(
+                    "DELETE FROM message_notifications WHERE cookie_id IN (SELECT id FROM cookies WHERE user_id = ?)",
+                    (user_id,),
+                )
 
                 # 10. 最后删除用户本身
-                cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
+                cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
 
                 # 提交事务
-                cursor.execute('COMMIT')
+                cursor.execute("COMMIT")
 
                 logger.info(f"用户及相关数据删除成功: user_id={user_id}")
                 return True
 
             except Exception as e:
                 # 回滚事务
-                cursor.execute('ROLLBACK')
+                cursor.execute("ROLLBACK")
                 logger.error(f"删除用户及相关数据失败: {e}")
                 return False
 
@@ -3630,31 +4380,35 @@ class DBManager:
 
                 # 根据表名确定主键字段
                 primary_key_map = {
-                    'users': 'id',
-                    'cookies': 'id',
-                    'keywords': 'id',
-                    'default_replies': 'id',
-                    'ai_reply_settings': 'id',
-                    'message_notifications': 'id',
-                    'cards': 'id',
-                    'delivery_rules': 'id',
-                    'notification_channels': 'id',
-                    'user_settings': 'id',
-                    'email_verifications': 'id',
-                    'captcha_codes': 'id'
+                    "users": "id",
+                    "cookies": "id",
+                    "keywords": "id",
+                    "default_replies": "id",
+                    "ai_reply_settings": "id",
+                    "message_notifications": "id",
+                    "cards": "id",
+                    "delivery_rules": "id",
+                    "notification_channels": "id",
+                    "user_settings": "id",
+                    "email_verifications": "id",
+                    "captcha_codes": "id",
                 }
 
-                primary_key = primary_key_map.get(table_name, 'id')
+                primary_key = primary_key_map.get(table_name, "id")
 
                 # 删除记录
-                cursor.execute(f"DELETE FROM {table_name} WHERE {primary_key} = ?", (record_id,))
+                cursor.execute(
+                    f"DELETE FROM {table_name} WHERE {primary_key} = ?", (record_id,)
+                )
 
                 if cursor.rowcount > 0:
                     self.conn.commit()
                     logger.info(f"删除表记录成功: {table_name}.{record_id}")
                     return True
                 else:
-                    logger.warning(f"删除表记录失败，记录不存在: {table_name}.{record_id}")
+                    logger.warning(
+                        f"删除表记录失败，记录不存在: {table_name}.{record_id}"
+                    )
                     return False
 
             except Exception as e:
@@ -3672,7 +4426,9 @@ class DBManager:
                 cursor.execute(f"DELETE FROM {table_name}")
 
                 # 重置自增ID（如果有的话）
-                cursor.execute(f"DELETE FROM sqlite_sequence WHERE name = ?", (table_name,))
+                cursor.execute(
+                    f"DELETE FROM sqlite_sequence WHERE name = ?", (table_name,)
+                )
 
                 self.conn.commit()
                 logger.info(f"清空表数据成功: {table_name}")
@@ -3689,4 +4445,5 @@ db_manager = DBManager()
 
 # 确保进程结束时关闭数据库连接
 import atexit
+
 atexit.register(db_manager.close)

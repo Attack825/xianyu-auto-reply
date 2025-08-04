@@ -21,23 +21,23 @@ from file_log_collector import setup_file_logging
 
 def _start_api_server():
     """后台线程启动 FastAPI 服务"""
-    api_conf = AUTO_REPLY.get('api', {})
+    api_conf = AUTO_REPLY.get("api", {})
 
     # 优先使用环境变量配置
-    host = os.getenv('API_HOST', '0.0.0.0')  # 默认绑定所有接口
-    port = int(os.getenv('API_PORT', '8080'))  # 默认端口8080
+    host = os.getenv("API_HOST", "0.0.0.0")  # 默认绑定所有接口
+    port = int(os.getenv("API_PORT", "8080"))  # 默认端口8080
 
     # 如果配置文件中有特定配置，则使用配置文件
-    if 'host' in api_conf:
-        host = api_conf['host']
-    if 'port' in api_conf:
-        port = api_conf['port']
+    if "host" in api_conf:
+        host = api_conf["host"]
+    if "port" in api_conf:
+        port = api_conf["port"]
 
     # 兼容旧的URL配置方式
-    if 'url' in api_conf and 'host' not in api_conf and 'port' not in api_conf:
-        url = api_conf.get('url', 'http://0.0.0.0:8080/xianyu/reply')
+    if "url" in api_conf and "host" not in api_conf and "port" not in api_conf:
+        url = api_conf.get("url", "http://0.0.0.0:8080/xianyu/reply")
         parsed = urlparse(url)
-        if parsed.hostname and parsed.hostname != 'localhost':
+        if parsed.hostname and parsed.hostname != "localhost":
             host = parsed.hostname
         port = parsed.port or 8080
 
@@ -51,17 +51,17 @@ def load_keywords_file(path: str):
     p = Path(path)
     if not p.exists():
         return kw_list
-    with p.open('r', encoding='utf-8') as f:
+    with p.open("r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
-            if not line or line.startswith('#'):
+            if not line or line.startswith("#"):
                 continue
-            if '\t' in line:
-                k, r = line.split('\t', 1)
-            elif ' ' in line:
-                k, r = line.split(' ', 1)
-            elif ':' in line:
-                k, r = line.split(':', 1)
+            if "\t" in line:
+                k, r = line.split("\t", 1)
+            elif " " in line:
+                k, r = line.split(" ", 1)
+            elif ":" in line:
+                k, r = line.split(":", 1)
             else:
                 continue
             kw_list.append((k.strip(), r.strip()))
@@ -95,9 +95,10 @@ async def main():
         try:
             # 直接启动任务，不重新保存到数据库
             from db_manager import db_manager
+
             logger.info(f"正在获取Cookie详细信息: {cid}")
             cookie_info = db_manager.get_cookie_details(cid)
-            user_id = cookie_info.get('user_id') if cookie_info else None
+            user_id = cookie_info.get("user_id") if cookie_info else None
             logger.info(f"Cookie详细信息获取成功: {cid}, user_id: {user_id}")
 
             logger.info(f"正在创建异步任务: {cid}")
@@ -108,24 +109,25 @@ async def main():
         except Exception as e:
             logger.error(f"启动 Cookie 任务失败: {cid}, {e}")
             import traceback
+
             logger.error(f"详细错误信息: {traceback.format_exc()}")
-    
+
     # 2) 如果配置文件中有新的 Cookie，也加载它们
     for entry in COOKIES_LIST:
-        cid = entry.get('id')
-        val = entry.get('value')
+        cid = entry.get("id")
+        val = entry.get("value")
         if not cid or not val or cid in manager.cookies:
             continue
-        
-        kw_file = entry.get('keywords_file')
+
+        kw_file = entry.get("keywords_file")
         kw_list = load_keywords_file(kw_file) if kw_file else None
         manager.add_cookie(cid, val, kw_list)
         logger.info(f"从配置文件加载 Cookie: {cid}")
 
     # 3) 若老环境变量仍提供单账号 Cookie，则作为 default 账号
-    env_cookie = os.getenv('COOKIES_STR')
-    if env_cookie and 'default' not in manager.list_cookies():
-        manager.add_cookie('default', env_cookie)
+    env_cookie = os.getenv("COOKIES_STR")
+    if env_cookie and "default" not in manager.list_cookies():
+        manager.add_cookie("default", env_cookie)
         logger.info("从环境变量加载 default Cookie")
 
     # 启动 API 服务线程
@@ -138,5 +140,5 @@ async def main():
     await asyncio.Event().wait()
 
 
-if __name__ == '__main__':
-    asyncio.run(main()) 
+if __name__ == "__main__":
+    asyncio.run(main())
